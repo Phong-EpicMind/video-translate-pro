@@ -41,6 +41,7 @@ TranslateDub AI.app/
 TranslateDub AI.spec
 build/
 dist/
+release-artifacts/
 static/icon.icns
 *.dmg
 
