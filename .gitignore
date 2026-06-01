@@ -19,3 +19,10 @@ config.json
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# PyInstaller Desktop Build artifacts
+TranslateDub AI.app/
+TranslateDub AI.spec
+build/
+dist/
+static/icon.icns
