@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environment
+venv/
+.env
+
+# Application Temporary files (crucial to prevent repo bloating)
+temp/
+
+# Confidential configurations (highly critical to protect API Keys and GCP Credentials)
+config.json
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride

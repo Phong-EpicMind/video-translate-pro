@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Translate Pro - Lồng Tiếng & Phụ Đề AI</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Controls -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                <div class="logo-text">
+                    <h1>Translate Pro</h1>
+                    <span>Powered by Google AI</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- Section: API Config -->
+                <div class="nav-section">
+                    <h2 class="section-title"><i class="fa-solid fa-key"></i> Google Cấu Hình</h2>
+                    <div class="form-group">
+                        <label for="geminiKey">Gemini API Key <span class="required">*</span></label>
+                        <div class="input-password-wrapper">
+                            <input type="password" id="geminiKey" placeholder="Nhập API Key từ AI Studio..." value="{{ config.gemini_key or '' }}">
+                            <button type="button" id="toggleGeminiKey" class="btn-toggle-eye"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                        <span class="help-text">Nhận key miễn phí tại <a href="https://aistudio.google.com/" target="_blank">Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square"></i></a></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ttsEngine">Động cơ lồng tiếng</label>
+                        <select id="ttsEngine">
+                            <option value="gtts" {% if config.tts_engine == 'gtts' %}selected{% endif %}>gTTS (Google Translate - Miễn Phí)</option>
+                            <option value="google_cloud" {% if config.tts_engine == 'google_cloud' %}selected{% endif %}>Google Cloud TTS (Siêu Thực)</option>
+                        </select>
+                    </div>
+
+                    <div id="gcpCredentialsGroup" class="form-group" style="display: none;">
+                        <label for="gcpCredentials">Google Cloud Credentials JSON</label>
+                        <textarea id="gcpCredentials" rows="3" placeholder='Dán Service Account JSON vào đây...'>{{ config.google_cloud_credentials or '' }}</textarea>
+                        <span class="help-text">Yêu cầu tài khoản Google Cloud có bật API TTS.</span>
+                    </div>
+                </div>
+
+                <!-- Section: Languages -->
+                <div class="nav-section">
+                    <h2 class="section-title"><i class="fa-solid fa-language"></i> Ngôn Ngữ Dịch</h2>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="srcLang">Nguồn</label>
+                            <select id="srcLang">
+                                <option value="auto" {% if config.src_lang == 'auto' or not config.src_lang %}selected{% endif %}>Tự nhận diện</option>
+                                <option value="en" {% if config.src_lang == 'en' %}selected{% endif %}>English</option>
+                                <option value="vi" {% if config.src_lang == 'vi' %}selected{% endif %}>Tiếng Việt</option>
+                                <option value="zh" {% if config.src_lang == 'zh' %}selected{% endif %}>中文</option>
+                                <option value="ja" {% if config.src_lang == 'ja' %}selected{% endif %}>日本語</option>
+                                <option value="ko" {% if config.src_lang == 'ko' %}selected{% endif %}>한국어</option>
+                                <option value="fr" {% if config.src_lang == 'fr' %}selected{% endif %}>Français</option>
+                                <option value="de" {% if config.src_lang == 'de' %}selected{% endif %}>Deutsch</option>
+                                <option value="es" {% if config.src_lang == 'es' %}selected{% endif %}>Español</option>
+                            </select>
+                        </div>
+                        <div class="form-group half">
+                            <label for="targetLang">Đích</label>
+                            <select id="targetLang">
+                                <option value="vi" {% if config.target_lang == 'vi' or not config.target_lang %}selected{% endif %}>Tiếng Việt</option>
+                                <option value="en" {% if config.target_lang == 'en' %}selected{% endif %}>English</option>
+                                <option value="zh" {% if config.target_lang == 'zh' %}selected{% endif %}>中文</option>
+                                <option value="ja" {% if config.target_lang == 'ja' %}selected{% endif %}>日本語</option>
+                                <option value="ko" {% if config.target_lang == 'ko' %}selected{% endif %}>한국어</option>
+                                <option value="fr" {% if config.target_lang == 'fr' %}selected{% endif %}>Français</option>
+                                <option value="de" {% if config.target_lang == 'de' %}selected{% endif %}>Deutsch</option>
+                                <option value="es" {% if config.target_lang == 'es' %}selected{% endif %}>Español</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Advanced -->
+                <div class="nav-section">
+                    <h2 class="section-title"><i class="fa-solid fa-sliders"></i> Tùy Chọn Lồng Tiếng</h2>
+                    <div class="form-group" id="voiceNameGroup" style="display: none;">
+                        <label for="voiceName">Giọng đọc (Cloud TTS)</label>
+                        <select id="voiceName" class="styled-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="slider-label">
+                            <label>Tốc độ cơ bản giọng nói</label>
+                            <span id="baseSpeedVal">1.0x</span>
+                        </div>
+                        <input type="range" id="baseSpeed" min="0.8" max="1.5" step="0.05" value="1.0">
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="matchDuration" checked>
+                            <span class="checkmark"></span>
+                            Khớp thời lượng thoại với video
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="slider-label">
+                            <label>Nhạc nền gốc</label>
+                            <span id="originalVolVal">10%</span>
+                        </div>
+                        <input type="range" id="originalVol" min="0" max="1" step="0.05" value="0.10">
+                    </div>
+
+                    <div class="form-group">
+                        <div class="slider-label">
+                            <label>Giọng lồng tiếng</label>
+                            <span id="dubVolVal">100%</span>
+                        </div>
+                        <input type="range" id="dubVol" min="0" max="1" step="0.05" value="1.00">
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="burnSubtitles">
+                            <span class="checkmark"></span>
+                            Ghi phụ đề cứng vào video (Burn-sub)
+                        </label>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="saveConfigBtn" class="btn btn-secondary btn-block"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <main class="main-content">
+            <!-- Header Status -->
+            <header class="app-header">
+                <div class="header-title">
+                    <h2>Dịch thuật & Lồng tiếng Video</h2>
+                    <p>Đơn giản hóa quy trình sản xuất video đa ngôn ngữ với trí tuệ nhân tạo của Google.</p>
+                </div>
+                <div class="app-status">
+                    <span class="status-badge connected"><span class="dot"></span> Chạy cục bộ (macOS)</span>
+                </div>
+            </header>
+
+            <div class="workspace-card">
+                <!-- State 1: Dropzone for Upload -->
+                <div id="dropzoneState" class="workspace-state active">
+                    <div class="upload-box" id="uploadBox">
+                        <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                        <h3>Kéo thả file video vào đây</h3>
+                        <p>Hỗ trợ MP4, MKV, AVI, MOV... dung lượng lên tới 500MB</p>
+                        <div class="divider"><span>hoặc</span></div>
+                        <input type="file" id="videoFileInput" accept="video/*" style="display: none;">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('videoFileInput').click()"><i class="fa-solid fa-file-video"></i> Chọn file từ máy Mac</button>
+                        
+                        <div class="local-path-wrapper">
+                            <div class="divider"><span>hoặc nhập đường dẫn trực tiếp trên Mac</span></div>
+                            <div class="local-path-input">
+                                <input type="text" id="localVideoPath" placeholder="Ví dụ: /Users/username/Movies/sample.mp4">
+                                <button type="button" id="localPathSubmitBtn" class="btn btn-secondary">Tiếp tục</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- State 2: Processing Progress & Console -->
+                <div id="processingState" class="workspace-state">
+                    <div class="pipeline-card">
+                        <h3 id="pipelineTitle" class="pipeline-title"><i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý video...</h3>
+                        
+                        <!-- Flowchart representation -->
+                        <div class="pipeline-flow">
+                            <div class="flow-step" id="step_init">
+                                <div class="step-num"><i class="fa-solid fa-play"></i></div>
+                                <span>Khởi chạy</span>
+                            </div>
+                            <div class="flow-line"></div>
+                            <div class="flow-step" id="step_extract">
+                                <div class="step-num"><i class="fa-solid fa-drum"></i></div>
+                                <span>Trích âm thanh</span>
+                            </div>
+                            <div class="flow-line"></div>
+                            <div class="flow-step" id="step_transcribe">
+                                <div class="step-num"><i class="fa-solid fa-brain"></i></div>
+                                <span>Gemini AI</span>
+                            </div>
+                            <div class="flow-line"></div>
+                            <div class="flow-step" id="step_assemble">
+                                <div class="step-num"><i class="fa-solid fa-compact-disc"></i></div>
+                                <span>Lồng tiếng</span>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="processingProgressBar" style="width: 5%;"></div>
+                        </div>
+
+                        <!-- Terminal console log -->
+                        <div class="console-box">
+                            <div class="console-header">
+                                <span class="console-dot red"></span>
+                                <span class="console-dot yellow"></span>
+                                <span class="console-dot green"></span>
+                                <span class="console-title"><i class="fa-solid fa-terminal"></i> Log xử lý thời gian thực</span>
+                            </div>
+                            <div class="console-body" id="consoleBody">
+                                <div class="console-line system">[SYSTEM] Hệ thống đã sẵn sàng...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- State 3: Subtitle Editor -->
+                <div id="subtitleEditorState" class="workspace-state">
+                    <div class="editor-card">
+                        <div class="editor-header">
+                            <h3><i class="fa-solid fa-pen-to-square"></i> Biên tập Phụ đề & Bản dịch</h3>
+                            <p>Kiểm tra và sửa đổi bản dịch từ Gemini trước khi tiến hành lồng tiếng.</p>
+                        </div>
+
+                        <div class="editor-workspace">
+                            <!-- Left: Video Player for preview sync -->
+                            <div class="video-preview-pane">
+                                <video id="editorVideoPlayer" controls class="styled-video"></video>
+                                <div class="video-details">
+                                    <span id="editorVideoFilename"><i class="fa-solid fa-video"></i> video.mp4</span>
+                                </div>
+                            </div>
+
+                            <!-- Right: Editable Subtitle Grid -->
+                            <div class="subtitle-grid-pane">
+                                <table class="subtitle-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 60px;">Dòng</th>
+                                            <th style="width: 150px;">Thời gian (ms)</th>
+                                            <th>Gốc (Original)</th>
+                                            <th>Dịch (Translated)</th>
+                                            <th style="width: 60px;">Nghe</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="subtitleTableBody">
+                                        <!-- Dynamic entries will be inserted here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="editor-actions">
+                            <button id="cancelDubBtn" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Quay lại</button>
+                            <button id="startDubBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-circle-play"></i> Lồng Tiếng & Tạo Video</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- State 4: Complete & Preview -->
+                <div id="completeState" class="workspace-state">
+                    <div class="complete-card">
+                        <div class="success-header">
+                            <div class="success-icon"><i class="fa-solid fa-circle-check"></i></div>
+                            <h2>Lồng Tiếng Video Hoàn Tất!</h2>
+                            <p>Ứng dụng đã hoàn thành dịch thuật, lồng tiếng và lồng ghép phụ đề cực kỳ chính xác.</p>
+                        </div>
+
+                        <div class="final-preview">
+                            <video id="finalVideoPlayer" controls class="styled-video"></video>
+                        </div>
+
+                        <div class="result-info">
+                            <div class="info-row">
+                                <span class="label">Đường dẫn file trên máy Mac:</span>
+                                <span class="value select-all" id="finalVideoPath">/Users/username/Movies/...</span>
+                            </div>
+                        </div>
+
+                        <div class="complete-actions">
+                            <button id="startOverBtn" class="btn btn-secondary"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>
+                            <a id="downloadVideoBtn" download class="btn btn-primary btn-glow"><i class="fa-solid fa-download"></i> Tải về máy Mac</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Ghi chú</div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
