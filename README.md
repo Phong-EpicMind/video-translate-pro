@@ -2,7 +2,7 @@
 ### *World-Class Native macOS Desktop Video Translation & Dubbing Suite Integrated with Google AI APIs*
 
 [![CI](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/codeql.yml/badge.svg)](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/codeql.yml)
+[![Security Scan](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/security.yml/badge.svg)](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/Source%20License-MIT-green.svg)](LICENSE)
 
 ---
