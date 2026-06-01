@@ -1,5 +1,5 @@
 # TranslateDub AI - Trình dịch thuật & Lồng tiếng Video macOS Độc lập
-### *World-Class Native macOS Desktop Video Translation & Dubbing Suite Powered by Google AI*
+### *World-Class Native macOS Desktop Video Translation & Dubbing Suite Integrated with Google AI APIs*
 
 ---
 
@@ -48,9 +48,19 @@
 
 ## 📦 Hướng dẫn Cài đặt & Khởi chạy (Installation & Setup)
 
+### 🚀 Cách 1: Sử dụng File ảnh đĩa .DMG (Khuyên dùng cho người dùng cuối)
+Nếu bạn là khán giả hoặc muốn sử dụng ngay ứng dụng mà không cần quan tâm đến code hay cài đặt môi trường lập trình phức tạp:
+1. Tải về file **`TranslateDub_AI_macOS.dmg`** từ mục Releases của GitHub hoặc link chia sẻ.
+2. Nhấp đúp mở file `.dmg`, **kéo thả biểu tượng TranslateDub AI vào thư mục Applications** ở ngay bên cạnh.
+3. **Mở ứng dụng lần đầu:** Click chuột phải (hoặc nhấn phím `Control` + click) vào ứng dụng trong thư mục `Applications`, chọn **Open**, rồi nhấp **Open** ở hộp xác nhận để vượt qua cảnh báo macOS Gatekeeper (chỉ cần thực hiện 1 lần duy nhất).
+
+---
+
+### 💻 Cách 2: Cài đặt cho lập trình viên & Phát triển (Local Setup)
+
 ### Yêu cầu hệ thống (Prerequisites)
 1. Máy Mac chạy chip **Apple Silicon (M1/M2/M3/M4)** hoặc **Intel**.
-2. Đã cài đặt **FFmpeg** qua Homebrew:
+2. Đã cài đặt **FFmpeg** qua Homebrew (chỉ cần thiết cho môi trường code cục bộ, bản đóng gói `.dmg` đã tích hợp sẵn):
    ```bash
    brew install ffmpeg
    ```
@@ -71,7 +81,16 @@
 ### 2. Đóng gói ứng dụng Desktop macOS độc lập
 Để tự đóng gói mã nguồn thành ứng dụng `.app` độc lập trên máy Mac của bạn:
 ```bash
-./venv/bin/pyinstaller -y --noconsole --name "TranslateDub AI" --icon "static/icon.icns" --add-data "templates:templates" --add-data "static:static" desktop.py
+./venv/bin/pyinstaller -y --noconsole --name "TranslateDub AI" \
+  --icon "static/icon.icns" \
+  --add-data "templates:templates" \
+  --add-data "static:static" \
+  --add-data "LICENSE:." \
+  --add-data "THIRD_PARTY_NOTICES.md:." \
+  --add-data "FFMPEG_SOURCE_OFFER.md:." \
+  --add-binary "bin/ffmpeg:bin" \
+  --add-binary "bin/ffprobe:bin" \
+  desktop.py
 ```
 Sau khi hoàn tất, tệp cài đặt **TranslateDub AI.app** sẽ xuất hiện tại thư mục `dist/`. Bạn có thể sao chép nó trực tiếp vào thư mục `/Applications/` của macOS và ghim vào thanh Dock.
 
@@ -88,9 +107,16 @@ Sau khi hoàn tất, tệp cài đặt **TranslateDub AI.app** sẽ xuất hiệ
 
 ---
 
-## 📄 Bản quyền (License)
+## 📄 Bản quyền & Thông báo bên thứ ba (License & Third-Party Notices)
 
-Dự án được phân phối dưới giấy phép **MIT License**. Bạn hoàn toàn được phép chỉnh sửa, nâng cấp và cá nhân hóa cho các mục đích công việc của mình.
+### Giấy phép (License)
+* **Mã nguồn (Source Code):** Toàn bộ mã nguồn gốc của dự án **TranslateDub AI** được phân phối tự do dưới giấy phép **[MIT License](LICENSE)**. Bạn hoàn toàn được phép sử dụng, sao chép, sửa đổi, tích hợp hoặc phân phối mã nguồn này cho các mục đích của mình.
+* **Bản đóng gói (.dmg Bundle):** Bản đóng gói cài đặt sẵn có trên macOS chứa các thành phần nhị phân của bên thứ ba (như FFmpeg/FFprobe). Các thành phần này tuân thủ các giấy phép nguồn mở tương ứng của chúng (chủ yếu là GPL-3.0). Chi tiết giấy phép đầy đủ của bên thứ ba được ghi nhận tại **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**.
 
 ---
-*Phát triển bởi Phong Ho - Tối ưu hóa bởi Google AI Partner.*
+
+### Thông báo bên thứ ba (Third-Party Notices)
+Chi tiết về bản quyền và nguồn gốc của các thư viện, công cụ được tích hợp trong dự án (bao gồm ghi nhận công lao của dự án truyền cảm hứng **pyVideoTrans** và các tệp tĩnh **FFmpeg/FFprobe** theo chuẩn GPL-3.0) được kê khai đầy đủ tại tệp tin **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**. Nếu phát hành bản `.dmg` kèm FFmpeg/FFprobe, xem thêm **[FFMPEG_SOURCE_OFFER.md](FFMPEG_SOURCE_OFFER.md)** để chuẩn bị nguồn tương ứng hoặc written offer cho FFmpeg.
+
+---
+*Phát triển độc lập bởi Phong Ho. Tích hợp các công nghệ Google AI thế hệ mới.*

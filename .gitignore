@@ -26,3 +26,6 @@ TranslateDub AI.spec
 build/
 dist/
 static/icon.icns
+
+# Bundled binaries
+bin/

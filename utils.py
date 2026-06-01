@@ -50,6 +50,16 @@ def get_clean_env() -> dict:
 
 def get_ffmpeg_path(executable_name="ffmpeg") -> str:
     """Find the path of the given executable (ffmpeg or ffprobe) on macOS, considering GUI app PATH limitations"""
+    import sys
+    
+    # 1. Check if running under PyInstaller bundle and search the internal bin/ directory first
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+        bundled_path = os.path.join(base_path, "bin", executable_name)
+        if os.path.exists(bundled_path) and os.access(bundled_path, os.X_OK):
+            return bundled_path
+
+    # 2. Standard system fallback paths
     possible_paths = [
         f"/opt/homebrew/bin/{executable_name}",
         f"/usr/local/bin/{executable_name}",
