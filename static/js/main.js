@@ -96,10 +96,13 @@ const finalVideoPlayer = document.getElementById("finalVideoPlayer");
 const finalVideoPath = document.getElementById("finalVideoPath");
 const downloadVideoBtn = document.getElementById("downloadVideoBtn");
 const startOverBtn = document.getElementById("startOverBtn");
+const headerStartOverBtn = document.getElementById("headerStartOverBtn");
 
 // Sidebar configuration elements
 const geminiKey = document.getElementById("geminiKey");
 const toggleGeminiKey = document.getElementById("toggleGeminiKey");
+const outputDir = document.getElementById("outputDir");
+const selectOutputDirBtn = document.getElementById("selectOutputDirBtn");
 const ttsEngine = document.getElementById("ttsEngine");
 const gcpCredentials = document.getElementById("gcpCredentials");
 const gcpCredentialsGroup = document.getElementById("gcpCredentialsGroup");
@@ -135,6 +138,25 @@ function setupEventListeners() {
             toggleGeminiKey.innerHTML = '<i class="fa-solid fa-eye"></i>';
         }
     });
+
+    // Select output directory click
+    if (selectOutputDirBtn) {
+        selectOutputDirBtn.addEventListener("click", async () => {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.select_directory) {
+                try {
+                    const selected = await window.pywebview.api.select_directory();
+                    if (selected) {
+                        outputDir.value = selected;
+                        showToast("Đã chọn thư mục lưu: " + selected.split("/").pop());
+                    }
+                } catch (err) {
+                    console.error("Lỗi gọi API chọn thư mục:", err);
+                }
+            } else {
+                showToast("Vui lòng nhập/dán đường dẫn trực tiếp vào ô cấu hình.");
+            }
+        });
+    }
 
     // Handle Engine Toggle to show/hide credentials
     ttsEngine.addEventListener("change", () => {
@@ -207,14 +229,21 @@ function setupEventListeners() {
 
     startDubBtn.addEventListener("click", startDubbingPipeline);
 
-    startOverBtn.addEventListener("click", () => {
+    const resetAppFlow = () => {
         switchState(dropzoneState);
         finalVideoPlayer.pause();
         finalVideoPlayer.src = "";
+        editorVideoPlayer.pause();
+        editorVideoPlayer.src = "";
         currentVideoPath = "";
         currentSubtitles = [];
         localVideoPath.value = "";
-    });
+    };
+
+    startOverBtn.addEventListener("click", resetAppFlow);
+    if (headerStartOverBtn) {
+        headerStartOverBtn.addEventListener("click", resetAppFlow);
+    }
 }
 
 // Switch between panels
@@ -223,6 +252,17 @@ function switchState(activeState) {
         state.classList.remove("active");
     });
     activeState.classList.add("active");
+    
+    // Toggle header quick-reset button
+    if (headerStartOverBtn) {
+        if (activeState === dropzoneState) {
+            headerStartOverBtn.style.display = "none";
+        } else {
+            headerStartOverBtn.style.display = "inline-flex";
+            headerStartOverBtn.style.alignItems = "center";
+            headerStartOverBtn.style.gap = "6px";
+        }
+    }
 }
 
 // Show temporary notification
@@ -242,6 +282,7 @@ async function loadConfig() {
         const config = await response.json();
         
         if (config.gemini_key) geminiKey.value = config.gemini_key;
+        if (config.output_dir) outputDir.value = config.output_dir;
         if (config.tts_engine) ttsEngine.value = config.tts_engine;
         if (config.google_cloud_credentials) gcpCredentials.value = config.google_cloud_credentials;
         if (config.src_lang) srcLang.value = config.src_lang;
@@ -275,7 +316,8 @@ async function saveConfig() {
         target_lang: targetLang.value,
         voice_name: voiceName.value,
         base_speed: parseFloat(baseSpeed.value),
-        match_duration: matchDuration.checked
+        match_duration: matchDuration.checked,
+        output_dir: outputDir.value.trim()
     };
 
     if (!data.gemini_key) {

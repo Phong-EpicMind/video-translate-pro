@@ -34,14 +34,47 @@ def srt_time_to_ms(srt_time: str) -> int:
     h, m, s, ms = map(int, match.groups())
     return h * 3600000 + m * 60000 + s * 1000 + ms
 
+def get_clean_env() -> dict:
+    """Get a copy of the current environment but restore original library paths if running under PyInstaller (sys.frozen)"""
+    import sys
+    env = os.environ.copy()
+    if getattr(sys, 'frozen', False):
+        # Restore original dynamic library paths if PyInstaller modified them
+        for key in ['DYLD_LIBRARY_PATH', 'LD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH']:
+            orig_key = f"{key}_ORIG"
+            if orig_key in env:
+                env[key] = env[orig_key]
+            else:
+                env.pop(key, None)
+    return env
+
+def get_ffmpeg_path(executable_name="ffmpeg") -> str:
+    """Find the path of the given executable (ffmpeg or ffprobe) on macOS, considering GUI app PATH limitations"""
+    possible_paths = [
+        f"/opt/homebrew/bin/{executable_name}",
+        f"/usr/local/bin/{executable_name}",
+        f"/usr/bin/{executable_name}",
+        f"/bin/{executable_name}"
+    ]
+    for p in possible_paths:
+        if os.path.exists(p) and os.access(p, os.X_OK):
+            return p
+            
+    import shutil
+    shutil_path = shutil.which(executable_name)
+    if shutil_path:
+        return shutil_path
+        
+    return executable_name
+
 def get_media_duration(file_path: str) -> float:
     """Get the duration of a video or audio file in seconds using ffprobe"""
     cmd = [
-        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        get_ffmpeg_path("ffprobe"), "-v", "error", "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1", file_path
     ]
     try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True, env=get_clean_env())
         return float(result.stdout.strip())
     except Exception as e:
         print(f"Error getting duration for {file_path}: {e}")
@@ -50,12 +83,12 @@ def get_media_duration(file_path: str) -> float:
 def has_audio_stream(video_path: str) -> bool:
     """Check if a video file has an audio stream using ffprobe"""
     cmd = [
-        "ffprobe", "-v", "error", "-select_streams", "a",
+        get_ffmpeg_path("ffprobe"), "-v", "error", "-select_streams", "a",
         "-show_entries", "stream=codec_type", "-of", "default=nw=1:nk=1",
         video_path
     ]
     try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True, env=get_clean_env())
         return len(result.stdout.strip()) > 0
     except Exception as e:
         print(f"Error checking audio stream for {video_path}: {e}")
@@ -67,12 +100,12 @@ def extract_audio_from_video(video_path: str, audio_path: str, log_callback=None
         log_callback("Trích xuất âm thanh từ video...")
     
     cmd = [
-        "ffmpeg", "-y", "-i", video_path,
+        get_ffmpeg_path("ffmpeg"), "-y", "-i", video_path,
         "-vn", "-acodec", "libmp3lame", "-q:a", "2", "-ac", "1",
         audio_path
     ]
     try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=get_clean_env())
         if result.returncode != 0:
             if log_callback:
                 log_callback(f"Lỗi ffmpeg: {result.stderr}")
@@ -86,15 +119,7 @@ def extract_audio_from_video(video_path: str, audio_path: str, log_callback=None
         return False
 
 def transcribe_and_translate_chunk(client: genai.Client, audio_chunk_path: str, src_lang: str, target_lang: str, offset_ms: int, chunk_index: int, log_callback=None) -> list[dict]:
-    """Transcribe and translate a single audio chunk using Gemini 2.0 Flash"""
-    if log_callback:
-        log_callback(f"Đang tải phân đoạn âm thanh {chunk_index} lên Gemini API...")
-    
-    audio_file = client.files.upload(file=audio_chunk_path)
-    
-    if log_callback:
-        log_callback(f"Đang xử lý phụ đề & dịch thuật phân đoạn {chunk_index}...")
-
+    """Transcribe and translate a single audio chunk using Gemini with robust auto-retry and models fallback"""
     prompt = f"""You are a professional audio transcriber and translator.
 Task:
 1. Transcribe the provided audio file precisely.
@@ -106,88 +131,84 @@ Task:
 Ensure timestamps are highly accurate and aligned with the actual speech in the audio.
 """
 
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[audio_file, prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=SubtitleList,
-                temperature=0.0
-            ),
-        )
-    except Exception as e:
-        err_msg = str(e)
-        if "503" in err_msg or "UNAVAILABLE" in err_msg:
-            if log_callback:
-                log_callback("⚠️ Máy chủ Gemini 2.0 Flash đang bận (Lỗi 503). Đang tự động thử lại sau 3 giây...")
-            import time
-            time.sleep(3)
-            try:
-                response = client.models.generate_content(
-                    model='gemini-2.0-flash',
-                    contents=[audio_file, prompt],
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=SubtitleList,
-                        temperature=0.0
-                    ),
-                )
-            except Exception as e2:
-                err_msg2 = str(e2)
-                if log_callback:
-                    log_callback("⚠️ Máy chủ 2.0 vẫn bận. Tự động chuyển đổi sang Gemini 1.5 Flash vô cùng ổn định...")
-                response = client.models.generate_content(
-                    model='gemini-flash-latest',
-                    contents=[audio_file, prompt],
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=SubtitleList,
-                        temperature=0.0
-                    ),
-                )
-        elif "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower():
-            if log_callback:
-                log_callback("⚠️ Gemini 2.0 Flash bị hết hạn mức. Tự động chuyển đổi sang sử dụng Gemini 1.5 Flash vô cùng ổn định...")
-            
-            response = client.models.generate_content(
-                model='gemini-flash-latest',
-                contents=[audio_file, prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=SubtitleList,
-                    temperature=0.0
-                ),
-            )
-        else:
-            raise e
-    
-    # Delete the uploaded file from Gemini storage to be clean
-    try:
-        client.files.delete(name=audio_file.name)
-    except Exception as e:
-        print(f"Error deleting file {audio_file.name}: {e}")
+    models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']
+    max_retries_per_model = 2
+    last_exception = None
 
-    try:
-        data = json.loads(response.text)
-        subtitles = data.get("subtitles", [])
-        
-        # Apply offset and adjust indexes
-        adjusted_subs = []
-        for sub in subtitles:
-            adjusted_subs.append({
-                "index": len(adjusted_subs) + 1, # Will re-index globally later
-                "start_ms": sub.get("start_ms", 0) + offset_ms,
-                "end_ms": sub.get("end_ms", 0) + offset_ms,
-                "original_text": sub.get("original_text", "").strip(),
-                "translated_text": sub.get("translated_text", "").strip()
-            })
-        return adjusted_subs
-    except Exception as e:
-        if log_callback:
-            log_callback(f"Lỗi phân tích JSON từ Gemini ở phân đoạn {chunk_index}: {e}")
-            log_callback(f"Nội dung phản hồi lỗi: {response.text}")
-        return []
+    for model_name in models_to_try:
+        for attempt in range(max_retries_per_model):
+            audio_file = None
+            try:
+                if log_callback:
+                    log_callback(f"Đang xử lý phân đoạn {chunk_index} bằng {model_name} (Lần thử {attempt + 1})...")
+                
+                # 1. Upload File
+                audio_file = client.files.upload(file=audio_chunk_path)
+                
+                # 2. Generate Content
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[audio_file, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=SubtitleList,
+                        temperature=0.0
+                    ),
+                )
+                
+                # 3. Clean up the uploaded file from Gemini storage immediately
+                try:
+                    client.files.delete(name=audio_file.name)
+                except Exception as ex:
+                    print(f"Error deleting file {audio_file.name}: {ex}")
+                
+                # 4. Parse response
+                data = json.loads(response.text)
+                subtitles = data.get("subtitles", [])
+                
+                # Apply offset and adjust indexes
+                adjusted_subs = []
+                for sub in subtitles:
+                    adjusted_subs.append({
+                        "index": len(adjusted_subs) + 1,
+                        "start_ms": sub.get("start_ms", 0) + offset_ms,
+                        "end_ms": sub.get("end_ms", 0) + offset_ms,
+                        "original_text": sub.get("original_text", "").strip(),
+                        "translated_text": sub.get("translated_text", "").strip()
+                    })
+                return adjusted_subs
+                
+            except Exception as e:
+                last_exception = e
+                err_msg = str(e)
+                
+                # Clean up file if it was created
+                if audio_file:
+                    try:
+                        client.files.delete(name=audio_file.name)
+                    except:
+                        pass
+                
+                # Check if error is transient (503/429/Unavailable)
+                is_transient = "503" in err_msg or "UNAVAILABLE" in err_msg or "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower()
+                
+                if is_transient:
+                    wait_time = 3 * (attempt + 1)
+                    if log_callback:
+                        log_callback(f"⚠️ Máy chủ bận hoặc hết hạn mức (Lỗi {model_name}). Thử lại sau {wait_time} giây...")
+                    import time
+                    time.sleep(wait_time)
+                else:
+                    # Non-transient error (e.g. JSON schema, auth, etc.)
+                    if log_callback:
+                        log_callback(f"⚠️ Gặp lỗi với {model_name}: {err_msg[:120]}")
+                    break # Break retry loop to try the next model
+                    
+    # If all models and retries failed, raise the last exception
+    if last_exception:
+        raise last_exception
+    else:
+        raise Exception("Không thể xử lý phân đoạn do lỗi dịch thuật.")
 
 def transcribe_and_translate_audio(audio_path: str, gemini_key: str, src_lang: str, target_lang: str, log_callback=None) -> list[dict]:
     """Transcribe and translate audio file. Automatically chunks if file is long."""
@@ -229,10 +250,10 @@ def transcribe_and_translate_audio(audio_path: str, gemini_key: str, src_lang: s
                 log_callback(f"Cắt phân đoạn {i+1}/{num_chunks} (từ giây {start_sec:.1f})...")
                 
             cmd = [
-                "ffmpeg", "-y", "-ss", str(start_sec), "-t", str(chunk_duration_sec),
+                get_ffmpeg_path("ffmpeg"), "-y", "-ss", str(start_sec), "-t", str(chunk_duration_sec),
                 "-i", audio_path, "-acodec", "copy", chunk_path
             ]
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=get_clean_env())
             
             if not os.path.exists(chunk_path):
                 if log_callback:
@@ -365,11 +386,11 @@ def generate_tts_audio(
                     if abs(final_speed - 1.0) > 0.01:
                         temp_output = f"{os.path.splitext(output_path)[0]}_speed.mp3"
                         cmd = [
-                            "ffmpeg", "-y", "-i", output_path,
+                            get_ffmpeg_path("ffmpeg"), "-y", "-i", output_path,
                             "-filter:a", f"atempo={final_speed:.2f}",
                             temp_output
                         ]
-                        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=get_clean_env())
                         
                         if os.path.exists(temp_output):
                             os.replace(temp_output, output_path)
@@ -378,11 +399,11 @@ def generate_tts_audio(
             if abs(base_speed - 1.0) > 0.01 and engine == "gtts":
                 temp_output = f"{os.path.splitext(output_path)[0]}_speed.mp3"
                 cmd = [
-                    "ffmpeg", "-y", "-i", output_path,
+                    get_ffmpeg_path("ffmpeg"), "-y", "-i", output_path,
                     "-filter:a", f"atempo={base_speed:.2f}",
                     temp_output
                 ]
-                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=get_clean_env())
                 
                 if os.path.exists(temp_output):
                     os.replace(temp_output, output_path)
@@ -420,7 +441,7 @@ def merge_dubbed_audio_to_video(
         log_callback("Đang tiến hành ghép âm thanh và video...")
         log_callback(f"Nhạc nền gốc: {original_vol*100:.0f}%, Âm lượng lồng tiếng: {dub_vol*100:.0f}%")
         
-    cmd = ["ffmpeg", "-y"]
+    cmd = [get_ffmpeg_path("ffmpeg"), "-y"]
     
     # All inputs must be declared first
     cmd.extend(["-i", video_path])
@@ -466,7 +487,7 @@ def merge_dubbed_audio_to_video(
     try:
         if log_callback:
             log_callback(f"Lệnh chạy: {' '.join(cmd)}")
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=get_clean_env())
         if result.returncode != 0:
             if log_callback:
                 log_callback(f"Lỗi ghép video: {result.stderr}")

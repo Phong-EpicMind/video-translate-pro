@@ -1,8 +1,33 @@
 import os
+import sys
 import json
 import asyncio
 import uuid
 import shutil
+
+# Clean up PyInstaller dynamic library paths at startup so external subprocesses run in system environment
+if getattr(sys, 'frozen', False):
+    for key in ['DYLD_LIBRARY_PATH', 'LD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH']:
+        orig_key = f"{key}_ORIG"
+        if orig_key in os.environ:
+            os.environ[key] = os.environ[orig_key]
+        else:
+            os.environ.pop(key, None)
+
+# Prepend Homebrew and standard system paths to PATH so child processes (including pydub) can find ffmpeg/ffprobe
+homebrew_bin = "/opt/homebrew/bin"
+local_bin = "/usr/local/bin"
+current_path = os.environ.get("PATH", "")
+path_parts = []
+if os.path.exists(homebrew_bin):
+    path_parts.append(homebrew_bin)
+if os.path.exists(local_bin):
+    path_parts.append(local_bin)
+if current_path:
+    path_parts.append(current_path)
+if path_parts:
+    os.environ["PATH"] = os.pathsep.join(path_parts)
+
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
@@ -16,20 +41,31 @@ app = FastAPI(title="Video Translate Pro")
 
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMP_DIR = os.path.join(BASE_DIR, "temp")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
+# standard writable user home folder for temp and config on macOS
+USER_DATA_DIR = os.path.join(os.path.expanduser("~"), ".translatedub_ai")
+TEMP_DIR = os.path.join(USER_DATA_DIR, "temp")
+CONFIG_FILE = os.path.join(USER_DATA_DIR, "config.json")
+
+os.makedirs(USER_DATA_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(TEMPLATES_DIR, exist_ok=True)
+
+# Automatically migrate config from app bundle to user home directory if needed
+base_config_path = os.path.join(BASE_DIR, "config.json")
+if not os.path.exists(CONFIG_FILE) and os.path.exists(base_config_path):
+    try:
+        shutil.copy2(base_config_path, CONFIG_FILE)
+    except Exception:
+        pass
 
 # Mount static files and templates
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/temp", StaticFiles(directory=TEMP_DIR), name="temp") # Allow streaming/downloading preview videos easily
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
-
-CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 # Config Helpers
 def load_config():
@@ -55,6 +91,11 @@ class ConfigUpdate(BaseModel):
     google_cloud_credentials: Optional[str] = ""
     src_lang: Optional[str] = "auto"
     target_lang: Optional[str] = "vi"
+    tts_engine: Optional[str] = "gtts"
+    voice_name: Optional[str] = ""
+    base_speed: Optional[float] = 1.0
+    match_duration: Optional[bool] = True
+    output_dir: Optional[str] = ""
 
 class SubtitleItem(BaseModel):
     index: int
@@ -142,41 +183,74 @@ async def translate_progress(video_path: str, src_lang: str, target_lang: str, g
             # 2. Extract Audio
             yield f"data: {json.dumps({'step': 'extract', 'status': 'processing', 'message': 'Bắt đầu trích xuất âm thanh bằng ffmpeg...'})}\n\n"
             
+            extraction_logs = []
             def run_extraction():
-                return utils.extract_audio_from_video(video_path, audio_path)
+                def callback(msg):
+                    extraction_logs.append(msg)
+                    print(f"[FFmpeg Extract] {msg}")
+                return utils.extract_audio_from_video(video_path, audio_path, log_callback=callback)
                 
             success = await asyncio.to_thread(run_extraction)
+            
+            for log in extraction_logs:
+                yield f"data: {json.dumps({'step': 'extract', 'status': 'processing', 'message': log})}\n\n"
+                await asyncio.sleep(0.05)
+                
             if not success:
-                yield f"data: {json.dumps({'step': 'error', 'message': 'Không thể trích xuất âm thanh từ video.'})}\n\n"
+                last_err = extraction_logs[-1] if extraction_logs else "Lỗi không xác định."
+                yield f"data: {json.dumps({'step': 'error', 'message': f'Không thể trích xuất âm thanh từ video: {last_err}'})}\n\n"
                 return
                 
             yield f"data: {json.dumps({'step': 'extract', 'status': 'done', 'message': 'Trích xuất âm thanh thành công!'})}\n\n"
             await asyncio.sleep(0.5)
             
             # 3. Transcribe & Translate
-            yield f"data: {json.dumps({'step': 'transcribe', 'status': 'processing', 'message': 'Đang gửi âm thanh lên Google Gemini 2.0 Flash để nhận diện & dịch thuật...'})}\n\n"
+            yield f"data: {json.dumps({'step': 'transcribe', 'status': 'processing', 'message': 'Đang gửi âm thanh lên Google Gemini để nhận diện & dịch thuật...'})}\n\n"
             
-            def run_translation():
-                logs = []
+            import queue
+            import threading
+            
+            log_queue = queue.Queue()
+            result_container = {"subtitles": None, "success": False, "error": None}
+            
+            def run_translation_thread():
                 def callback(msg):
-                    logs.append(msg)
-                
-                res = utils.transcribe_and_translate_audio(
-                    audio_path=audio_path,
-                    gemini_key=gemini_key,
-                    src_lang=src_lang,
-                    target_lang=target_lang,
-                    log_callback=callback
-                )
-                return res, logs
-                
-            subtitles, translation_logs = await asyncio.to_thread(run_translation)
+                    log_queue.put(msg)
+                try:
+                    res = utils.transcribe_and_translate_audio(
+                        audio_path=audio_path,
+                        gemini_key=gemini_key,
+                        src_lang=src_lang,
+                        target_lang=target_lang,
+                        log_callback=callback
+                    )
+                    result_container["subtitles"] = res
+                    result_container["success"] = True
+                except Exception as ex:
+                    result_container["error"] = str(ex)
+                    result_container["success"] = False
+                finally:
+                    log_queue.put(None)
+                    
+            thread = threading.Thread(target=run_translation_thread, daemon=True)
+            thread.start()
             
-            # Emit intermediate progress logs from translation
-            for log in translation_logs:
-                yield f"data: {json.dumps({'step': 'transcribe', 'status': 'processing', 'message': log})}\n\n"
-                await asyncio.sleep(0.1)
+            while thread.is_alive() or not log_queue.empty():
+                try:
+                    msg = log_queue.get(block=False)
+                    if msg is None:
+                        break
+                    yield f"data: {json.dumps({'step': 'transcribe', 'status': 'processing', 'message': msg})}\n\n"
+                except queue.Empty:
+                    yield ": ping\n\n"
+                    await asyncio.sleep(0.5)
+                    
+            if not result_container["success"]:
+                err_msg = result_container["error"] or "Lỗi dịch thuật chưa xác định."
+                yield f"data: {json.dumps({'step': 'error', 'message': f'Lỗi dịch thuật: {err_msg}'})}\n\n"
+                return
                 
+            subtitles = result_container["subtitles"]
             if not subtitles:
                 yield f"data: {json.dumps({'step': 'error', 'message': 'Gemini không trả về bất kỳ kết quả phụ đề nào.'})}\n\n"
                 return
@@ -214,7 +288,12 @@ async def dub_progress(req: DubbingRequest):
         dubbed_audio_path = os.path.join(TEMP_DIR, f"{base_name}_dubbed.mp3")
         srt_path = os.path.join(TEMP_DIR, f"{base_name}_subtitles.srt")
         output_video_filename = f"{base_name}_translated.mp4"
-        output_video_path = os.path.join(TEMP_DIR, output_video_filename)
+        
+        output_dir = config.get("output_dir", "").strip()
+        if output_dir and os.path.isdir(output_dir):
+            output_video_path = os.path.join(output_dir, output_video_filename)
+        else:
+            output_video_path = os.path.join(TEMP_DIR, output_video_filename)
         
         try:
             # 1. Voice Synthesis (TTS)
@@ -275,6 +354,9 @@ async def dub_progress(req: DubbingRequest):
             
             def run_assembly():
                 from pydub import AudioSegment
+                AudioSegment.converter = utils.get_ffmpeg_path("ffmpeg")
+                AudioSegment.ffprobe = utils.get_ffmpeg_path("ffprobe")
+                
                 # Create silent base track matching video duration
                 base_track = AudioSegment.silent(duration=total_duration_ms)
                 for item in sub_dicts:
@@ -294,34 +376,60 @@ async def dub_progress(req: DubbingRequest):
             # 4. Merge Audio and Video
             yield f"data: {json.dumps({'step': 'merge', 'status': 'processing', 'message': 'Đang mix âm thanh lồng tiếng với video gốc...'})}\n\n"
             
-            def run_merge():
-                logs = []
-                def callback(msg):
-                    logs.append(msg)
-                res = utils.merge_dubbed_audio_to_video(
-                    video_path=video_path,
-                    dubbed_audio_path=dubbed_audio_path,
-                    output_path=output_video_path,
-                    original_vol=req.original_vol,
-                    dub_vol=req.dub_vol,
-                    srt_path=srt_path,
-                    burn_subtitles=req.burn_subtitles,
-                    log_callback=callback
-                )
-                return res, logs
-                
-            merge_success, merge_logs = await asyncio.to_thread(run_merge)
+            import queue
+            import threading
             
-            for log in merge_logs:
-                yield f"data: {json.dumps({'step': 'merge', 'status': 'processing', 'message': log})}\n\n"
-                await asyncio.sleep(0.1)
-                
-            if not merge_success:
-                yield f"data: {json.dumps({'step': 'error', 'message': 'Thất bại khi ghép âm thanh lồng tiếng vào video.'})}\n\n"
+            merge_queue = queue.Queue()
+            merge_container = {"success": False, "error": None}
+            
+            def run_merge_thread():
+                def callback(msg):
+                    merge_queue.put(msg)
+                try:
+                    res = utils.merge_dubbed_audio_to_video(
+                        video_path=video_path,
+                        dubbed_audio_path=dubbed_audio_path,
+                        output_path=output_video_path,
+                        original_vol=req.original_vol,
+                        dub_vol=req.dub_vol,
+                        srt_path=srt_path,
+                        burn_subtitles=req.burn_subtitles,
+                        log_callback=callback
+                    )
+                    merge_container["success"] = res
+                except Exception as ex:
+                    merge_container["error"] = str(ex)
+                    merge_container["success"] = False
+                finally:
+                    merge_queue.put(None)
+                    
+            m_thread = threading.Thread(target=run_merge_thread, daemon=True)
+            m_thread.start()
+            
+            while m_thread.is_alive() or not merge_queue.empty():
+                try:
+                    msg = merge_queue.get(block=False)
+                    if msg is None:
+                        break
+                    yield f"data: {json.dumps({'step': 'merge', 'status': 'processing', 'message': msg})}\n\n"
+                except queue.Empty:
+                    yield ": ping\n\n"
+                    await asyncio.sleep(0.5)
+                    
+            if not merge_container["success"]:
+                err_msg = merge_container["error"] or "Lỗi mix video chưa xác định."
+                yield f"data: {json.dumps({'step': 'error', 'message': f'Thất bại khi ghép âm thanh lồng tiếng vào video: {err_msg}'})}\n\n"
                 return
                 
             # Clean up chunks
             shutil.rmtree(chunks_dir, ignore_errors=True)
+            
+            # Copy to temp for browser preview if using a custom output dir
+            if output_dir and os.path.isdir(output_dir):
+                try:
+                    shutil.copy2(output_video_path, os.path.join(TEMP_DIR, output_video_filename))
+                except Exception as e:
+                    print(f"Error copying preview to temp: {e}")
             
             # Send relative preview URL (since /temp is mounted)
             preview_url = f"/temp/{output_video_filename}"

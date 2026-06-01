@@ -20,6 +20,21 @@ def run_server(port):
     from app import app
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
+class DesktopApi:
+    def __init__(self):
+        self._window = None
+
+    def set_window(self, window):
+        self._window = window
+
+    def select_directory(self):
+        if not self._window:
+            return None
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if result and len(result) > 0:
+            return result[0]
+        return None
+
 if __name__ == '__main__':
     import threading
     
@@ -39,12 +54,16 @@ if __name__ == '__main__':
     # Give uvicorn a split second to start up
     time.sleep(0.5)
 
+    desktop_api = DesktopApi()
+
     # Start PyWebview native window
-    webview.create_window(
+    window = webview.create_window(
         "TranslateDub AI", 
         f"http://127.0.0.1:{port}", 
+        js_api=desktop_api,
         width=1280, 
         height=800,
         min_size=(1024, 768)
     )
+    desktop_api.set_window(window)
     webview.start()

@@ -41,6 +41,15 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="outputDir">Thư mục lưu Video lồng tiếng</label>
+                        <div class="input-password-wrapper">
+                            <input type="text" id="outputDir" placeholder="Đường dẫn thư mục, ví dụ: /Users/.../Desktop" value="{{ config.output_dir or '' }}">
+                            <button type="button" id="selectOutputDirBtn" class="btn-toggle-eye" style="right: 10px;" title="Chọn thư mục"><i class="fa-solid fa-folder-open"></i></button>
+                        </div>
+                        <span class="help-text">Mặc định: Thư mục tạm của ứng dụng.</span>
+                    </div>
+
+                    <div class="form-group">
                         <label for="ttsEngine">Động cơ lồng tiếng</label>
                         <select id="ttsEngine">
                             <option value="gtts" {% if config.tts_engine == 'gtts' %}selected{% endif %}>gTTS (Google Translate - Miễn Phí)</option>
@@ -153,6 +162,7 @@
                     <p>Đơn giản hóa quy trình sản xuất video đa ngôn ngữ với trí tuệ nhân tạo của Google.</p>
                 </div>
                 <div class="app-status">
+                    <button id="headerStartOverBtn" class="btn btn-secondary btn-sm" style="margin-right: 12px; display: none; padding: 6px 12px; font-size: 13px; border-radius: 6px;"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>
                     <span class="status-badge connected"><span class="dot"></span> Chạy cục bộ (macOS)</span>
                 </div>
             </header>
@@ -290,8 +300,8 @@
                         </div>
 
                         <div class="complete-actions">
-                            <button id="startOverBtn" class="btn btn-secondary"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>
-                            <a id="downloadVideoBtn" download class="btn btn-primary btn-glow"><i class="fa-solid fa-download"></i> Tải về máy Mac</a>
+                            <button id="startOverBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>
+                            <a id="downloadVideoBtn" download class="btn btn-success btn-glow" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><i class="fa-solid fa-download"></i> Tải về máy Mac</a>
                         </div>
                     </div>
                 </div>
