@@ -105,6 +105,7 @@ const outputDir = document.getElementById("outputDir");
 const selectOutputDirBtn = document.getElementById("selectOutputDirBtn");
 const ttsEngine = document.getElementById("ttsEngine");
 const gcpCredentials = document.getElementById("gcpCredentials");
+const toggleGcpCredentials = document.getElementById("toggleGcpCredentials");
 const gcpCredentialsGroup = document.getElementById("gcpCredentialsGroup");
 const srcLang = document.getElementById("srcLang");
 const targetLang = document.getElementById("targetLang");
@@ -138,6 +139,19 @@ function setupEventListeners() {
             toggleGeminiKey.innerHTML = '<i class="fa-solid fa-eye"></i>';
         }
     });
+
+    // GCP credentials toggle visibility
+    if (toggleGcpCredentials) {
+        toggleGcpCredentials.addEventListener("click", () => {
+            if (gcpCredentials.style.webkitTextSecurity === "none") {
+                gcpCredentials.style.webkitTextSecurity = "disc";
+                toggleGcpCredentials.innerHTML = '<i class="fa-solid fa-eye"></i>';
+            } else {
+                gcpCredentials.style.webkitTextSecurity = "none";
+                toggleGcpCredentials.innerHTML = '<i class="fa-solid fa-eye-slash"></i>';
+            }
+        });
+    }
 
     // Select output directory click
     if (selectOutputDirBtn) {

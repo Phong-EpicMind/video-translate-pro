@@ -54,6 +54,13 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(TEMPLATES_DIR, exist_ok=True)
 
+# Enforce strict folder permissions: chmod 700 (owner read/write/execute only) for privacy
+try:
+    os.chmod(USER_DATA_DIR, 0o700)
+    os.chmod(TEMP_DIR, 0o700)
+except Exception:
+    pass
+
 # Automatically migrate config from app bundle to user home directory if needed
 base_config_path = os.path.join(BASE_DIR, "config.json")
 if not os.path.exists(CONFIG_FILE) and os.path.exists(base_config_path):
@@ -81,6 +88,13 @@ def save_config(config_data):
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=4, ensure_ascii=False)
+        
+        # Enforce strict file permissions: chmod 600 (owner read/write only) to protect credentials
+        try:
+            os.chmod(CONFIG_FILE, 0o600)
+        except Exception:
+            pass
+            
         return True
     except Exception:
         return False
