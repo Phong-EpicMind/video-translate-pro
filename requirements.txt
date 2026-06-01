@@ -6,3 +6,4 @@ google-genai>=0.1.1
 gTTS>=2.5.1
 google-cloud-texttospeech>=2.16.1
 pydub>=0.25.1
+pywebview>=6.2.1
