@@ -1,6 +1,10 @@
 # TranslateDub AI - Trình dịch thuật & Lồng tiếng Video macOS Độc lập
 ### *World-Class Native macOS Desktop Video Translation & Dubbing Suite Integrated with Google AI APIs*
 
+[![CI](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/codeql.yml/badge.svg)](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/Source%20License-MIT-green.svg)](LICENSE)
+
 ---
 
 **TranslateDub AI** là một ứng dụng Desktop Native cao cấp dành riêng cho macOS, được thiết kế để đơn giản hóa hoàn toàn quy trình dịch thuật, biên tập phụ đề và lồng tiếng video đa ngôn ngữ. Ứng dụng hoạt động hoàn toàn cục bộ, kết hợp giao diện **Glassmorphism hiện đại** và sức mạnh vượt trội của các mô hình **Google AI thế hệ mới (Gemini 2.5 Flash & Google Cloud TTS)**.

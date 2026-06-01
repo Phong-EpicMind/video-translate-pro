@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate source and release hygiene
+    runs-on: macos-14
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile Python sources
+        run: |
+          python -m compileall -q app.py desktop.py utils.py ptts_fallback.py scratch
+
+      - name: Import FastAPI app
+        run: |
+          python - <<'PY'
+          import app
+          assert app.app.title == "Video Translate Pro"
+          print("Imported", app.app.title)
+          PY
+
+      - name: Check repository hygiene
+        run: |
+          set -euo pipefail
+          forbidden='(^|/)(bin|dist|build|temp|venv|__pycache__)/|\.app/|\.dmg$|config\.json$|\.service-account\.json$|credentials.*\.json$|secret.*\.json$'
+          if git ls-files | grep -E "$forbidden"; then
+            echo "Tracked generated, binary, or secret-like files found." >&2
+            exit 1
+          fi
+          test -f LICENSE
+          test -f THIRD_PARTY_NOTICES.md
+          test -f FFMPEG_SOURCE_OFFER.md
+
+      - name: Check public wording policy
+        run: |
+          set -euo pipefail
+          if grep -RInE 'clean-room|Google AI Partner|Powered by Google|file:///' README.md templates static *.md; then
+            echo "Risky public wording found." >&2
+            exit 1
+          fi
+          grep -q 'pyVideoTrans' THIRD_PARTY_NOTICES.md
+          grep -q 'f435ce22e1' FFMPEG_SOURCE_OFFER.md

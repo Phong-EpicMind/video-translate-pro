@@ -4,16 +4,32 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
 # Environment
 venv/
+.venv/
 .env
+.env.*
+!.env.example
 
 # Application Temporary files (crucial to prevent repo bloating)
 temp/
+*.mp3
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.srt
 
 # Confidential configurations (highly critical to protect API Keys and GCP Credentials)
 config.json
+*.service-account.json
+*credentials*.json
+*secret*.json
 
 # macOS files
 .DS_Store
@@ -26,6 +42,7 @@ TranslateDub AI.spec
 build/
 dist/
 static/icon.icns
+*.dmg
 
 # Bundled binaries
 bin/
