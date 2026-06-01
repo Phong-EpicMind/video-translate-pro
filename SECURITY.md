@@ -21,4 +21,6 @@ Include:
 
 ## Secret Handling
 
-The app stores user credentials locally under `~/.translatedub_ai/` with restrictive file permissions. Never commit local `config.json`, Google Cloud service account JSON, API keys, temporary videos, generated audio, or app build artifacts.
+The app stores user credentials locally under `~/.translatedub_ai/` with restrictive file permissions. The configuration API returns only non-secret settings plus boolean "configured" flags, not stored Gemini API keys or Google Cloud service account JSON.
+
+Never commit local `config.json`, Google Cloud service account JSON, API keys, temporary videos, generated audio, or app build artifacts.

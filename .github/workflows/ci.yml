@@ -42,6 +42,48 @@ jobs:
           print("Imported", app.app.title)
           PY
 
+      - name: Verify config API redacts credentials
+        run: |
+          python - <<'PY'
+          import importlib
+          import json
+          import os
+          import tempfile
+
+          with tempfile.TemporaryDirectory() as home:
+              os.environ["HOME"] = home
+              app_module = importlib.import_module("app")
+              from fastapi.testclient import TestClient
+
+              client = TestClient(app_module.app, client=("127.0.0.1", 50000))
+              payload = {
+                  "gemini_key": "TEST_GEMINI_SECRET",
+                  "google_cloud_credentials": "{\"private_key\":\"TEST_PRIVATE_KEY\",\"client_email\":\"x@example.com\"}",
+                  "src_lang": "auto",
+                  "target_lang": "vi",
+                  "tts_engine": "google_cloud",
+                  "voice_name": "vi-VN-Neural2-A",
+                  "base_speed": 1.0,
+                  "match_duration": True,
+                  "output_dir": "",
+              }
+              response = client.post("/api/config", json=payload)
+              assert response.status_code == 200, response.text
+              response_text = json.dumps(response.json())
+              assert "TEST_GEMINI_SECRET" not in response_text
+              assert "TEST_PRIVATE_KEY" not in response_text
+
+              response = client.get("/api/config")
+              assert response.status_code == 200, response.text
+              body = response.json()
+              response_text = json.dumps(body)
+              assert body["has_gemini_key"] is True
+              assert body["has_google_cloud_credentials"] is True
+              assert "TEST_GEMINI_SECRET" not in response_text
+              assert "TEST_PRIVATE_KEY" not in response_text
+              assert oct(os.stat(app_module.CONFIG_FILE).st_mode & 0o777) == "0o600"
+          PY
+
       - name: Check repository hygiene
         run: |
           set -euo pipefail
@@ -53,6 +95,14 @@ jobs:
           test -f LICENSE
           test -f THIRD_PARTY_NOTICES.md
           test -f FFMPEG_SOURCE_OFFER.md
+
+      - name: Check tracked files for secret patterns
+        run: |
+          set -euo pipefail
+          if git grep -nE 'AIza[0-9A-Za-z_-]{35}|-----BEGIN (RSA|OPENSSH|PRIVATE) KEY-----|private_key_id|client_secret|ghp_[0-9A-Za-z]{36,}|github_pat_[0-9A-Za-z_]{20,}|sk-[A-Za-z0-9]{20,}' -- . ':(exclude).github/workflows/ci.yml'; then
+            echo "Secret-like value found in tracked files." >&2
+            exit 1
+          fi
 
       - name: Check public wording policy
         run: |

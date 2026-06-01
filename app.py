@@ -39,6 +39,8 @@ import utils
 
 app = FastAPI(title="Video Translate Pro")
 
+LOCAL_CLIENT_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -58,21 +60,22 @@ os.makedirs(TEMPLATES_DIR, exist_ok=True)
 try:
     os.chmod(USER_DATA_DIR, 0o700)
     os.chmod(TEMP_DIR, 0o700)
+    if os.path.exists(CONFIG_FILE):
+        os.chmod(CONFIG_FILE, 0o600)
 except Exception:
     pass
-
-# Automatically migrate config from app bundle to user home directory if needed
-base_config_path = os.path.join(BASE_DIR, "config.json")
-if not os.path.exists(CONFIG_FILE) and os.path.exists(base_config_path):
-    try:
-        shutil.copy2(base_config_path, CONFIG_FILE)
-    except Exception:
-        pass
 
 # Mount static files and templates
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/temp", StaticFiles(directory=TEMP_DIR), name="temp") # Allow streaming/downloading preview videos easily
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+@app.middleware("http")
+async def local_only_requests(request: Request, call_next):
+    client_host = request.client.host if request.client else ""
+    if client_host not in LOCAL_CLIENT_HOSTS:
+        return JSONResponse(status_code=403, content={"detail": "Local access only."})
+    return await call_next(request)
 
 # Config Helpers
 def load_config():
@@ -86,9 +89,10 @@ def load_config():
 
 def save_config(config_data):
     try:
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        fd = os.open(CONFIG_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=4, ensure_ascii=False)
-        
+
         # Enforce strict file permissions: chmod 600 (owner read/write only) to protect credentials
         try:
             os.chmod(CONFIG_FILE, 0o600)
@@ -99,10 +103,24 @@ def save_config(config_data):
     except Exception:
         return False
 
+def public_config(config_data):
+    """Return UI-safe settings without exposing stored credentials."""
+    return {
+        "has_gemini_key": bool(config_data.get("gemini_key")),
+        "has_google_cloud_credentials": bool(config_data.get("google_cloud_credentials")),
+        "src_lang": config_data.get("src_lang", "auto"),
+        "target_lang": config_data.get("target_lang", "vi"),
+        "tts_engine": config_data.get("tts_engine", "gtts"),
+        "voice_name": config_data.get("voice_name", ""),
+        "base_speed": config_data.get("base_speed", 1.0),
+        "match_duration": config_data.get("match_duration", True),
+        "output_dir": config_data.get("output_dir", ""),
+    }
+
 # Pydantic schemas for request payloads
 class ConfigUpdate(BaseModel):
-    gemini_key: str
-    google_cloud_credentials: Optional[str] = ""
+    gemini_key: Optional[str] = None
+    google_cloud_credentials: Optional[str] = None
     src_lang: Optional[str] = "auto"
     target_lang: Optional[str] = "vi"
     tts_engine: Optional[str] = "gtts"
@@ -132,7 +150,7 @@ class DubbingRequest(BaseModel):
 # Page routes
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    config = load_config()
+    config = public_config(load_config())
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -142,14 +160,24 @@ async def read_item(request: Request):
 # API routes
 @app.get("/api/config")
 async def get_config():
-    return JSONResponse(content=load_config())
+    return JSONResponse(content=public_config(load_config()))
 
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
     config = load_config()
-    config.update(data.model_dump())
+    incoming = data.model_dump()
+    for key, value in incoming.items():
+        if key in {"gemini_key", "google_cloud_credentials"}:
+            if value:
+                config[key] = value
+            continue
+        config[key] = value
+
+    if not config.get("gemini_key"):
+        raise HTTPException(status_code=400, detail="Gemini API Key is required.")
+
     if save_config(config):
-        return {"status": "success", "message": "Lưu cài đặt thành công!"}
+        return {"status": "success", "message": "Lưu cài đặt thành công!", "config": public_config(config)}
     else:
         raise HTTPException(status_code=500, detail="Không thể lưu file cấu hình.")
 
@@ -169,7 +197,7 @@ async def upload_video(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Lỗi tải video: {e}")
 
 @app.get("/api/translate/progress")
-async def translate_progress(video_path: str, src_lang: str, target_lang: str, gemini_key: Optional[str] = None):
+async def translate_progress(video_path: str, src_lang: str, target_lang: str):
     """SSE endpoint to perform transcription & translation with live progress logs"""
     async def log_generator():
         # Validate inputs
@@ -177,10 +205,8 @@ async def translate_progress(video_path: str, src_lang: str, target_lang: str, g
             yield f"data: {json.dumps({'step': 'error', 'message': 'Không tìm thấy file video nguồn.'})}\n\n"
             return
             
-        nonlocal gemini_key
-        if not gemini_key:
-            config = load_config()
-            gemini_key = config.get("gemini_key")
+        config = load_config()
+        gemini_key = config.get("gemini_key")
             
         if not gemini_key:
             yield f"data: {json.dumps({'step': 'error', 'message': 'Chưa nhập Gemini API Key.'})}\n\n"

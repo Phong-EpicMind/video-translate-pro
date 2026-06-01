@@ -105,9 +105,10 @@ Sau khi hoàn tất, tệp cài đặt **TranslateDub AI.app** sẽ xuất hiệ
 Ứng dụng tuân thủ nghiêm ngặt các quy tắc bảo mật của hệ thống macOS:
 1. **Phân quyền UNIX Tối thiểu (chmod 600 / 700):**
    * Thư mục dữ liệu ứng dụng `~/.translatedub_ai/` được gán quyền `chmod 700` (chỉ chủ tài khoản được truy cập).
-   * File cấu hình khóa API `config.json` được gán quyền `chmod 600` (chỉ chủ tài khoản được đọc/ghi), ngăn chặn triệt để các mã độc cục bộ đọc trộm.
-2. **WebKit Multiline Masking:** Ô dán Service Account JSON của Google Cloud được che giấu bằng mặt nạ chấm đĩa bảo mật nguyên bản của macOS Safari engine, ngăn chặn rò rỉ khóa khi chia sẻ màn hình.
-3. **Môi trường cách ly Git (.gitignore):** Tệp cấu hình chứa API Key cục bộ và các thư mục video tạm được thêm vào danh sách bỏ qua của Git để ngăn chặn tuyệt đối việc vô tình tải dữ liệu nhạy cảm lên GitHub.
+   * File cấu hình khóa API `config.json` được tạo với quyền `chmod 600` (chỉ chủ tài khoản được đọc/ghi).
+2. **Không trả secret về giao diện:** API cấu hình chỉ trả trạng thái đã lưu key/credentials, không trả lại Gemini API Key hoặc Google Cloud Service Account JSON đã lưu.
+3. **WebKit Multiline Masking:** Ô dán Service Account JSON của Google Cloud được che giấu bằng mặt nạ chấm đĩa của macOS Safari engine để giảm rủi ro lộ khóa khi chia sẻ màn hình.
+4. **Môi trường cách ly Git (.gitignore):** Tệp cấu hình chứa API Key cục bộ và các thư mục video tạm được thêm vào danh sách bỏ qua của Git để giảm rủi ro vô tình tải dữ liệu nhạy cảm lên GitHub.
 
 ---
 

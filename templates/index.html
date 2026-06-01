@@ -34,7 +34,7 @@
                     <div class="form-group">
                         <label for="geminiKey">Gemini API Key <span class="required">*</span></label>
                         <div class="input-password-wrapper">
-                            <input type="password" id="geminiKey" placeholder="Nhập API Key từ AI Studio..." value="{{ config.gemini_key or '' }}">
+                            <input type="password" id="geminiKey" placeholder="Nhập API Key từ AI Studio..." autocomplete="off">
                             <button type="button" id="toggleGeminiKey" class="btn-toggle-eye"><i class="fa-solid fa-eye"></i></button>
                         </div>
                         <span class="help-text">Nhận key miễn phí tại <a href="https://aistudio.google.com/" target="_blank">Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square"></i></a></span>
@@ -62,7 +62,7 @@
                             <label for="gcpCredentials" style="margin-bottom: 0;">Google Cloud Credentials JSON</label>
                             <button type="button" id="toggleGcpCredentials" class="btn-toggle-eye" style="position: static; background: none; border: none; padding: 0; color: var(--text-secondary); cursor: pointer;" title="Hiện/Ẩn thông tin"><i class="fa-solid fa-eye"></i></button>
                         </div>
-                        <textarea id="gcpCredentials" rows="3" placeholder='Dán Service Account JSON vào đây...' style="-webkit-text-security: disc; font-family: monospace;">{{ config.google_cloud_credentials or '' }}</textarea>
+                        <textarea id="gcpCredentials" rows="3" placeholder='Dán Service Account JSON vào đây...' autocomplete="off" style="-webkit-text-security: disc; font-family: monospace;"></textarea>
                         <span class="help-text">Yêu cầu tài khoản Google Cloud có bật API TTS.</span>
                     </div>
                 </div>

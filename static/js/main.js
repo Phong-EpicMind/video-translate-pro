@@ -1,6 +1,8 @@
 // State Variables
 let currentVideoPath = "";
 let currentSubtitles = [];
+let hasSavedGeminiKey = false;
+let hasSavedGoogleCloudCredentials = false;
 
 // Google Cloud TTS Premium Voices Database
 const PREMIUM_VOICES = {
@@ -295,10 +297,14 @@ async function loadConfig() {
         const response = await fetch("/api/config");
         const config = await response.json();
         
-        if (config.gemini_key) geminiKey.value = config.gemini_key;
+        hasSavedGeminiKey = Boolean(config.has_gemini_key);
+        hasSavedGoogleCloudCredentials = Boolean(config.has_google_cloud_credentials);
+        geminiKey.value = "";
+        geminiKey.placeholder = hasSavedGeminiKey ? "Gemini API Key đã lưu - nhập key mới để thay thế" : "Nhập API Key từ AI Studio...";
+        gcpCredentials.value = "";
+        gcpCredentials.placeholder = hasSavedGoogleCloudCredentials ? "Google Cloud JSON đã lưu - dán JSON mới để thay thế" : "Dán Service Account JSON vào đây...";
         if (config.output_dir) outputDir.value = config.output_dir;
         if (config.tts_engine) ttsEngine.value = config.tts_engine;
-        if (config.google_cloud_credentials) gcpCredentials.value = config.google_cloud_credentials;
         if (config.src_lang) srcLang.value = config.src_lang;
         if (config.target_lang) targetLang.value = config.target_lang;
         
@@ -334,8 +340,12 @@ async function saveConfig() {
         output_dir: outputDir.value.trim()
     };
 
-    if (!data.gemini_key) {
+    if (!data.gemini_key && !hasSavedGeminiKey) {
         showToast("Vui lòng nhập Gemini API Key!");
+        return;
+    }
+    if (data.tts_engine === "google_cloud" && !data.google_cloud_credentials && !hasSavedGoogleCloudCredentials) {
+        showToast("Vui lòng nhập Google Cloud Credentials JSON!");
         return;
     }
 
@@ -347,6 +357,13 @@ async function saveConfig() {
         });
         const result = await response.json();
         if (result.status === "success") {
+            const savedConfig = result.config || {};
+            hasSavedGeminiKey = Boolean(savedConfig.has_gemini_key);
+            hasSavedGoogleCloudCredentials = Boolean(savedConfig.has_google_cloud_credentials);
+            geminiKey.value = "";
+            gcpCredentials.value = "";
+            geminiKey.placeholder = hasSavedGeminiKey ? "Gemini API Key đã lưu - nhập key mới để thay thế" : "Nhập API Key từ AI Studio...";
+            gcpCredentials.placeholder = hasSavedGoogleCloudCredentials ? "Google Cloud JSON đã lưu - dán JSON mới để thay thế" : "Dán Service Account JSON vào đây...";
             showToast("Cài đặt đã được lưu thành công!");
         } else {
             showToast("Có lỗi xảy ra: " + result.detail);
@@ -367,13 +384,19 @@ async function saveConfigSilently() {
         base_speed: parseFloat(baseSpeed.value),
         match_duration: matchDuration.checked
     };
-    if (!data.gemini_key) return;
+    if (!data.gemini_key && !hasSavedGeminiKey) return;
     try {
-        await fetch("/api/config", {
+        const response = await fetch("/api/config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data)
         });
+        if (response.ok) {
+            const result = await response.json();
+            const savedConfig = result.config || {};
+            hasSavedGeminiKey = Boolean(savedConfig.has_gemini_key);
+            hasSavedGoogleCloudCredentials = Boolean(savedConfig.has_google_cloud_credentials);
+        }
     } catch (e) {
         console.error("Silent config save error:", e);
     }
@@ -398,7 +421,13 @@ function logToConsole(message, type = "system") {
     // Add timestamp
     const now = new Date();
     const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-    line.innerHTML = `<span class="console-line-time" style="color: var(--text-muted); margin-right: 8px;">[${timeStr}]</span> ${message}`;
+    const time = document.createElement("span");
+    time.className = "console-line-time";
+    time.style.color = "var(--text-muted)";
+    time.style.marginRight = "8px";
+    time.textContent = `[${timeStr}]`;
+    line.appendChild(time);
+    line.appendChild(document.createTextNode(String(message)));
     
     consoleBody.appendChild(line);
     consoleBody.scrollTop = consoleBody.scrollHeight;
@@ -409,7 +438,7 @@ async function handleFileUpload(file) {
     // Verify file exists
     if (!file) return;
 
-    if (!geminiKey.value.trim()) {
+    if (!geminiKey.value.trim() && !hasSavedGeminiKey) {
         showToast("Vui lòng lưu Gemini API Key ở thanh bên trước!");
         return;
     }
@@ -468,7 +497,7 @@ function resetPipelineFlowchart() {
 
 // Start Speech-to-Text & Translation (SSE)
 function startTranslationPipeline(videoPath) {
-    if (!geminiKey.value.trim()) {
+    if (!geminiKey.value.trim() && !hasSavedGeminiKey) {
         showToast("Vui lòng nhập Gemini API Key ở thanh bên!");
         switchState(dropzoneState);
         return;
@@ -486,9 +515,8 @@ function startTranslationPipeline(videoPath) {
     const src = srcLang.value;
     const target = targetLang.value;
     
-    const key = geminiKey.value.trim();
     // Initiate Server-Sent Events source
-    const sseUrl = `/api/translate/progress?video_path=${encodeURIComponent(videoPath)}&src_lang=${src}&target_lang=${target}&gemini_key=${encodeURIComponent(key)}`;
+    const sseUrl = `/api/translate/progress?video_path=${encodeURIComponent(videoPath)}&src_lang=${src}&target_lang=${target}`;
     const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = function(event) {
@@ -570,7 +598,11 @@ function initSubtitleEditor(subtitles) {
     }
     
     editorVideoPlayer.src = relativeVideoUrl;
-    editorVideoFilename.innerHTML = `<i class="fa-solid fa-video"></i> ${currentVideoPath.split("/").pop()}`;
+    editorVideoFilename.replaceChildren();
+    const filenameIcon = document.createElement("i");
+    filenameIcon.className = "fa-solid fa-video";
+    editorVideoFilename.appendChild(filenameIcon);
+    editorVideoFilename.appendChild(document.createTextNode(` ${currentVideoPath.split("/").pop()}`));
     
     subtitles.forEach(sub => {
         const tr = document.createElement("tr");
