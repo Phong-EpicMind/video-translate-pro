@@ -1,89 +1,131 @@
-# TranslateDub AI - Trình dịch thuật & Lồng tiếng Video macOS Độc lập
-### *World-Class Native macOS Desktop Video Translation & Dubbing Suite Integrated with Google AI APIs*
+# TranslateDub AI
 
-[![CI](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml)
-[![Security Scan](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/security.yml/badge.svg)](https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/security.yml)
-[![License: MIT](https://img.shields.io/badge/Source%20License-MIT-green.svg)](LICENSE)
+<p align="center">
+  <strong>Native macOS video translation, subtitle editing, and AI dubbing for creators.</strong>
+</p>
 
----
+<p align="center">
+  Translate videos into another language, review subtitles, generate a dubbed voice track, and export a ready-to-share video from a local macOS desktop app.
+</p>
 
-**TranslateDub AI** là một ứng dụng Desktop Native cao cấp dành riêng cho macOS, được thiết kế để đơn giản hóa hoàn toàn quy trình dịch thuật, biên tập phụ đề và lồng tiếng video đa ngôn ngữ. Ứng dụng hoạt động hoàn toàn cục bộ, kết hợp giao diện **Glassmorphism hiện đại** và sức mạnh vượt trội của các mô hình **Google AI thế hệ mới (Gemini 2.5 Flash & Google Cloud TTS)**.
+<p align="center">
+  <a href="https://github.com/Phong-EpicMind/video-translate-pro/releases/latest"><strong>Download latest macOS DMG</strong></a>
+  ·
+  <a href="#quick-start">Quick Start</a>
+  ·
+  <a href="#tieng-viet">Tiếng Việt</a>
+  ·
+  <a href="SECURITY.md">Security</a>
+  ·
+  <a href="THIRD_PARTY_NOTICES.md">Third-party Notices</a>
+</p>
 
-> [!IMPORTANT]
-> **Cam kết Bảo mật Tuyệt đối (Security-First Standard):** Ứng dụng đáp ứng các tiêu chuẩn bảo mật hệ thống nghiêm ngặt. Khóa API và tài liệu cấu hình được mã hóa hiển thị và khóa chặt bằng phân quyền Unix (`chmod 600` / `chmod 700`) trực tiếp trên máy Mac của bạn. Không bao giờ lưu trữ hoặc gửi thông tin cấu hình lên bất kỳ máy chủ bên thứ ba nào.
-
----
-
-## 🌟 Tính Năng Nổi Bật (Key Features)
-
-### 1. Trải nghiệm Glassmorphic Premium UI
-* Giao diện Dark Mode huyền ảo với các khối kính mờ và gradient phát sáng mượt mà.
-* Hỗ trợ **Kéo & Thả (Drag-and-Drop)** file video hoặc nhập đường dẫn cục bộ trên máy Mac siêu nhanh.
-* **Real-time Pipeline Tracker:** Theo dõi tiến trình xử lý từng khâu thông qua bảng hiển thị Console Log thời gian thực chi tiết.
-
-### 2. Trình dịch thuật Google AI Siêu tốc
-* Tự động trích xuất âm thanh chất lượng cao bằng `ffmpeg` thông qua dọn dẹp môi trường dynamic link an toàn.
-* Nhận dạng giọng nói (STT) và Dịch thuật thông minh trong một luồng đơn lẻ bằng **Gemini 2.5 Flash** (với khả năng tự động chia đoạn thông minh cho video dài).
-* Cơ chế **Auto-Retry & Model Fallback** thông minh vượt qua các đợt nghẽn mạng của Google API bằng cách tự động thử lại và hạ cấp xuống `gemini-2.0-flash` hoặc `gemini-2.0-flash-lite` mà không làm treo app.
-
-### 3. Biên tập Phụ đề Tương tác (Interactive Subtitle Editor)
-* Trình xem trước và biên tập phụ đề trực quan với bảng hiển thị song ngữ (Gốc - Dịch).
-* **Đồng bộ hóa trình phát (Player Sync):** Nút phát thử từng dòng phụ đề tự động nhảy trình phát video cục bộ đến đúng mốc thời gian (timestamp) để kiểm tra ngữ điệu.
-
-### 4. Tổng hợp Giọng nói Siêu thực (Premium TTS Engine)
-* Tích hợp 12+ giọng đọc **Google Cloud TTS Premium** phân chia rõ ràng theo Vùng miền (Bắc/Nam) và Giới tính (Nam/Nữ).
-* Thuật toán **Khớp thời lượng thoại (Match Duration)** và điều chỉnh tốc độ chuẩn gốc (`speaking_rate` từ 0.8x đến 1.25x), giữ trọn vẹn cao độ tự nhiên, loại bỏ hoàn toàn giọng robot kim loại.
-
-### 5. Cấu hình Xuất bản tùy chỉnh & Thiết kế Độc lập
-* Tích hợp hộp chọn **Native macOS Finder Folder Picker** giúp nhấp chọn thư mục lưu video bất kỳ trên máy Mac.
-* Khóa bảo mật API Key toàn diện thông qua phân quyền tệp tin và mặt nạ hiển thị WebKit (`-webkit-text-security`).
+<p align="center">
+  <a href="https://github.com/Phong-EpicMind/video-translate-pro/releases/latest">
+    <img alt="Latest release" src="https://img.shields.io/github/v/release/Phong-EpicMind/video-translate-pro?label=latest%20release">
+  </a>
+  <a href="https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/ci.yml/badge.svg">
+  </a>
+  <a href="https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/security.yml">
+    <img alt="Security scan" src="https://github.com/Phong-EpicMind/video-translate-pro/actions/workflows/security.yml/badge.svg">
+  </a>
+  <a href="LICENSE">
+    <img alt="Source license: MIT" src="https://img.shields.io/badge/source%20license-MIT-green">
+  </a>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20arm64-black">
+</p>
 
 ---
 
-## 🛠️ Công Nghệ Sử Dụng (Technology Stack)
+## Download
 
-* **Core Backend:** Python 3.11, FastAPI (Uvicorn daemon)
-* **Desktop Wrapper:** PyWebview (Cocoa Native WebKit - WKWebView)
-* **AI & Cloud Engine:** Google GenAI SDK (Gemini 2.5 Flash), Google Cloud Text-to-Speech API, gTTS
-* **Audio/Video Processing:** FFmpeg, FFprobe, Pydub
-* **Frontend UI:** HTML5, Vanilla CSS3 (Glassmorphism), Vanilla JavaScript ES6
+The current public build is **TranslateDub AI v0.1.2** for **macOS Apple Silicon arm64**.
 
----
+| What you need | Link |
+| --- | --- |
+| Installable app | [TranslateDub_AI_macOS_arm64_v0.1.2.dmg](https://github.com/Phong-EpicMind/video-translate-pro/releases/download/v0.1.2/TranslateDub_AI_macOS_arm64_v0.1.2.dmg) |
+| Release page | [TranslateDub AI v0.1.2](https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.1.2) |
+| Checksums | [SHA256SUMS.txt](https://github.com/Phong-EpicMind/video-translate-pro/releases/download/v0.1.2/SHA256SUMS.txt) |
 
-## 📦 Hướng dẫn Cài đặt & Khởi chạy (Installation & Setup)
+> macOS notice: this build is ad-hoc signed but not Apple Developer ID signed or notarized yet. On first launch, macOS may require **Control-click > Open**.
 
-### 🚀 Cách 1: Sử dụng File ảnh đĩa .DMG (Khuyên dùng cho người dùng cuối)
-Nếu bạn là khán giả hoặc muốn sử dụng ngay ứng dụng mà không cần quan tâm đến code hay cài đặt môi trường lập trình phức tạp:
-1. Tải về file **`TranslateDub_AI_macOS.dmg`** từ mục Releases của GitHub hoặc link chia sẻ.
-2. Nhấp đúp mở file `.dmg`, **kéo thả biểu tượng TranslateDub AI vào thư mục Applications** ở ngay bên cạnh.
-3. **Mở ứng dụng lần đầu:** Click chuột phải (hoặc nhấn phím `Control` + click) vào ứng dụng trong thư mục `Applications`, chọn **Open**, rồi nhấp **Open** ở hộp xác nhận để vượt qua cảnh báo macOS Gatekeeper (chỉ cần thực hiện 1 lần duy nhất).
+## What It Does
 
----
+TranslateDub AI is a local-first macOS desktop application for video translation and dubbing workflows:
 
-### 💻 Cách 2: Cài đặt cho lập trình viên & Phát triển (Local Setup)
+1. Import a local video file.
+2. Extract audio with bundled FFmpeg.
+3. Transcribe and translate speech with Google Gemini.
+4. Review and edit bilingual subtitles.
+5. Generate a dubbed voice track with gTTS or Google Cloud Text-to-Speech.
+6. Export a translated video with optional burned-in subtitles.
 
-### Yêu cầu hệ thống (Prerequisites)
-1. Máy Mac chạy chip **Apple Silicon (M1/M2/M3/M4)** hoặc **Intel**.
-2. Đã cài đặt **FFmpeg** qua Homebrew (chỉ cần thiết cho môi trường code cục bộ, bản đóng gói `.dmg` đã tích hợp sẵn):
-   ```bash
-   brew install ffmpeg
-   ```
+It is an independent implementation inspired by the general workflow of [pyVideoTrans](https://github.com/jianchang512/pyvideotrans). It does not vendor or depend on pyVideoTrans source code, assets, or binaries.
 
-### 1. Cài đặt môi trường phát triển cục bộ
-1. Clone mã nguồn về máy:
-   ```bash
-   git clone <your-repository-url>
-   cd video-translate-pro
-   ```
-2. Tạo Virtual Environment và cài đặt thư viện:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
+## Highlights
 
-### 2. Đóng gói ứng dụng Desktop macOS độc lập
-Để tự đóng gói mã nguồn thành ứng dụng `.app` độc lập trên máy Mac của bạn:
+| Area | Details |
+| --- | --- |
+| Desktop experience | Native macOS window powered by PyWebView and a FastAPI local backend |
+| Translation workflow | Gemini-based speech transcription and translation with chunking for longer videos |
+| Subtitle review | Interactive subtitle editor with original and translated text side by side |
+| Dubbing | gTTS fallback plus Google Cloud Text-to-Speech voice support |
+| Video processing | Bundled FFmpeg and FFprobe in packaged macOS releases |
+| Privacy | Credentials are stored in macOS Keychain, not in the repository or release bundle |
+| Release hygiene | CI, Bandit scan, checksums, third-party notices, and FFmpeg corresponding source archive |
+
+## Quick Start
+
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Phong-EpicMind/video-translate-pro/releases/latest).
+2. Open the `.dmg`.
+3. Drag **TranslateDub AI** into **Applications**.
+4. Open the app.
+5. Add your Gemini API key. If using premium Google Cloud TTS, add a Google Cloud Service Account JSON with Text-to-Speech access.
+6. Drop in a video and run the translation workflow.
+
+## Requirements
+
+| Requirement | Notes |
+| --- | --- |
+| macOS | Current packaged build targets Apple Silicon arm64 |
+| Gemini API key | Required for transcription and translation |
+| Google Cloud Text-to-Speech credentials | Optional, only needed for Google Cloud TTS voices |
+| FFmpeg | Bundled in the `.dmg`; Homebrew FFmpeg is only needed for local development |
+
+## Security And Privacy
+
+TranslateDub AI is designed as a local desktop app. The app does not ship with API keys or service account files.
+
+| Data | Handling |
+| --- | --- |
+| Gemini API key | Stored in macOS Keychain under `com.phongho.translatedubai` |
+| Google Cloud Service Account JSON | Stored in macOS Keychain under `com.phongho.translatedubai` |
+| Non-secret preferences | Stored in `~/.translatedub_ai/config.json` with owner-only file permissions |
+| Temporary media | Stored under `~/.translatedub_ai/temp` |
+| GitHub releases | Checked for accidental `config.json` or credential JSON files before publishing |
+
+See [SECURITY.md](SECURITY.md) for the vulnerability reporting process.
+
+## Build From Source
+
+```bash
+git clone https://github.com/Phong-EpicMind/video-translate-pro.git
+cd video-translate-pro
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python desktop.py
+```
+
+For local development, install FFmpeg:
+
+```bash
+brew install ffmpeg
+```
+
+To create a local macOS app bundle:
+
 ```bash
 ./venv/bin/pyinstaller -y --noconsole --name "TranslateDub AI" \
   --icon "static/icon.icns" \
@@ -96,35 +138,74 @@ Nếu bạn là khán giả hoặc muốn sử dụng ngay ứng dụng mà khô
   --add-binary "bin/ffprobe:bin" \
   desktop.py
 ```
-Sau khi hoàn tất, tệp cài đặt **TranslateDub AI.app** sẽ xuất hiện tại thư mục `dist/`. Bạn có thể sao chép nó trực tiếp vào thư mục `/Applications/` của macOS và ghim vào thanh Dock.
+
+## Licensing
+
+The TranslateDub AI source code is distributed under the [MIT License](LICENSE).
+
+Packaged macOS releases may include third-party binaries and libraries under their own licenses. In particular, the release `.dmg` bundles FFmpeg and FFprobe binaries that report `--enable-gpl --enable-version3`; these are treated as GPL-3.0 components. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [FFMPEG_SOURCE_OFFER.md](FFMPEG_SOURCE_OFFER.md).
+
+## Project Links
+
+| Resource | Link |
+| --- | --- |
+| Releases | [GitHub Releases](https://github.com/Phong-EpicMind/video-translate-pro/releases) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Security | [SECURITY.md](SECURITY.md) |
+| Code of Conduct | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| Release checklist | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
+| Third-party notices | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
 ---
 
-## 🔒 Tiêu Chuẩn Bảo Mật Quốc Tế (Security & Privacy Standards)
+<a id="tieng-viet"></a>
 
-Ứng dụng tuân thủ nghiêm ngặt các quy tắc bảo mật của hệ thống macOS:
-1. **macOS Keychain cho secret:**
-   * Gemini API Key và Google Cloud Service Account JSON được lưu trong macOS Keychain dưới service `com.phongho.translatedubai`.
-   * Nếu phát hiện secret cũ trong `~/.translatedub_ai/config.json`, app sẽ tự chuyển sang Keychain và ghi lại file cấu hình không chứa secret.
-2. **Phân quyền UNIX Tối thiểu (chmod 600 / 700):**
-   * Thư mục dữ liệu ứng dụng `~/.translatedub_ai/` được gán quyền `chmod 700` (chỉ chủ tài khoản được truy cập).
-   * File cấu hình non-secret `config.json` được tạo với quyền `chmod 600` (chỉ chủ tài khoản được đọc/ghi).
-3. **Không trả secret về giao diện:** API cấu hình chỉ trả trạng thái đã lưu key/credentials, không trả lại Gemini API Key hoặc Google Cloud Service Account JSON đã lưu.
-4. **WebKit Multiline Masking:** Ô dán Service Account JSON của Google Cloud được che giấu bằng mặt nạ chấm đĩa của macOS Safari engine để giảm rủi ro lộ khóa khi chia sẻ màn hình.
-5. **Môi trường cách ly Git (.gitignore):** Tệp cấu hình cục bộ và các thư mục video tạm được thêm vào danh sách bỏ qua của Git để giảm rủi ro vô tình tải dữ liệu nhạy cảm lên GitHub.
+## Tiếng Việt
 
----
+**TranslateDub AI** là ứng dụng desktop macOS giúp dịch video, biên tập phụ đề song ngữ, tạo giọng lồng tiếng bằng AI và xuất video đã dịch từ một quy trình cục bộ trên máy Mac.
 
-## 📄 Bản quyền & Thông báo bên thứ ba (License & Third-Party Notices)
+### Tải về
 
-### Giấy phép (License)
-* **Mã nguồn (Source Code):** Toàn bộ mã nguồn gốc của dự án **TranslateDub AI** được phân phối tự do dưới giấy phép **[MIT License](LICENSE)**. Bạn hoàn toàn được phép sử dụng, sao chép, sửa đổi, tích hợp hoặc phân phối mã nguồn này cho các mục đích của mình.
-* **Bản đóng gói (.dmg Bundle):** Bản đóng gói cài đặt sẵn có trên macOS chứa các thành phần nhị phân của bên thứ ba (như FFmpeg/FFprobe). Các thành phần này tuân thủ các giấy phép nguồn mở tương ứng của chúng (chủ yếu là GPL-3.0). Chi tiết giấy phép đầy đủ của bên thứ ba được ghi nhận tại **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**.
+Bản public hiện tại là **TranslateDub AI v0.1.2** cho **macOS Apple Silicon arm64**.
 
----
+| Nội dung | Link |
+| --- | --- |
+| File cài đặt | [TranslateDub_AI_macOS_arm64_v0.1.2.dmg](https://github.com/Phong-EpicMind/video-translate-pro/releases/download/v0.1.2/TranslateDub_AI_macOS_arm64_v0.1.2.dmg) |
+| Trang release | [TranslateDub AI v0.1.2](https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.1.2) |
+| Kiểm tra checksum | [SHA256SUMS.txt](https://github.com/Phong-EpicMind/video-translate-pro/releases/download/v0.1.2/SHA256SUMS.txt) |
 
-### Thông báo bên thứ ba (Third-Party Notices)
-Chi tiết về bản quyền và nguồn gốc của các thư viện, công cụ được tích hợp trong dự án (bao gồm ghi nhận công lao của dự án truyền cảm hứng **pyVideoTrans** và các tệp tĩnh **FFmpeg/FFprobe** theo chuẩn GPL-3.0) được kê khai đầy đủ tại tệp tin **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**. Nếu phát hành bản `.dmg` kèm FFmpeg/FFprobe, xem thêm **[FFMPEG_SOURCE_OFFER.md](FFMPEG_SOURCE_OFFER.md)** để chuẩn bị nguồn tương ứng hoặc written offer cho FFmpeg.
+> Lưu ý macOS: bản hiện tại đã ký ad-hoc nhưng chưa Apple Developer ID signed/notarized. Lần đầu mở app có thể cần **Control-click > Open**.
 
----
-*Phát triển độc lập bởi Phong Ho. Tích hợp các công nghệ Google AI thế hệ mới.*
+### Ứng dụng làm được gì
+
+1. Chọn hoặc kéo thả video trên máy Mac.
+2. Tách âm thanh bằng FFmpeg được bundle sẵn trong bản `.dmg`.
+3. Nhận dạng lời nói và dịch bằng Google Gemini.
+4. Biên tập phụ đề gốc và bản dịch trong giao diện song ngữ.
+5. Tạo track lồng tiếng bằng gTTS hoặc Google Cloud Text-to-Speech.
+6. Xuất video đã lồng tiếng, có tùy chọn gắn phụ đề vào video.
+
+Đây là một dự án độc lập, lấy cảm hứng từ quy trình tổng quát của [pyVideoTrans](https://github.com/jianchang512/pyvideotrans). Repo này không vendor, copy, hay phụ thuộc vào source code, asset, hoặc binary của pyVideoTrans.
+
+### Hướng dẫn cài đặt nhanh
+
+1. Tải file `.dmg` mới nhất tại [GitHub Releases](https://github.com/Phong-EpicMind/video-translate-pro/releases/latest).
+2. Mở file `.dmg`.
+3. Kéo **TranslateDub AI** vào thư mục **Applications**.
+4. Mở app.
+5. Nhập Gemini API key. Nếu dùng Google Cloud TTS, nhập thêm Google Cloud Service Account JSON có quyền Text-to-Speech.
+6. Đưa video vào app và chạy quy trình dịch.
+
+### Bảo mật
+
+| Dữ liệu | Cách xử lý |
+| --- | --- |
+| Gemini API key | Lưu trong macOS Keychain với service `com.phongho.translatedubai` |
+| Google Cloud Service Account JSON | Lưu trong macOS Keychain với service `com.phongho.translatedubai` |
+| Cấu hình không nhạy cảm | Lưu tại `~/.translatedub_ai/config.json` với quyền chỉ chủ máy đọc/ghi |
+| File tạm | Lưu trong `~/.translatedub_ai/temp` |
+| Release GitHub | Kiểm tra không bundle nhầm `config.json` hoặc file credential JSON |
+
+### Giấy phép
+
+Source code của TranslateDub AI được phát hành theo [MIT License](LICENSE). Bản `.dmg` có thể kèm các thành phần bên thứ ba theo license riêng, đặc biệt là FFmpeg/FFprobe theo GPL-3.0. Xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) và [FFMPEG_SOURCE_OFFER.md](FFMPEG_SOURCE_OFFER.md).

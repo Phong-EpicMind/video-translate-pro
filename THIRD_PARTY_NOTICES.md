@@ -2,6 +2,8 @@
 
 This document contains licensing and copyright notices for third-party software components included in or referenced by **TranslateDub AI**.
 
+Tiếng Việt: Tài liệu này ghi nhận license và copyright của các thành phần bên thứ ba được sử dụng hoặc được tham chiếu bởi **TranslateDub AI**. Phần tiếng Anh dưới đây là thông báo pháp lý chính; phần tiếng Việt ở cuối file tóm tắt các điểm quan trọng cho người dùng Việt Nam.
+
 ---
 
 ## 1. FFmpeg and FFprobe (Bundled Binaries)
@@ -52,3 +54,13 @@ The packaged `.app` may also include transitive Python dependencies selected by 
 * **websockets** (BSD 3-Clause License)
 
 When publishing a packaged `.dmg`, include this file, `FFMPEG_SOURCE_OFFER.md`, and the root `LICENSE` file in the release package so recipients can inspect both the TranslateDub AI source license and bundled third-party notices.
+
+---
+
+## Tóm tắt Tiếng Việt
+
+* Source code riêng của TranslateDub AI được phát hành theo MIT License.
+* Bản `.dmg` có bundle FFmpeg và FFprobe để xử lý audio/video. Hai binary này báo cáo `--enable-gpl --enable-version3`, vì vậy được đối xử như thành phần GPL-3.0.
+* Khi phát hành `.dmg` có kèm FFmpeg/FFprobe, release phải kèm source archive tương ứng hoặc written source offer hợp lệ. Xem `FFMPEG_SOURCE_OFFER.md`.
+* pyVideoTrans chỉ được ghi nhận là nguồn cảm hứng về workflow. Repo này không chứa source code, asset, hoặc binary của pyVideoTrans và không phụ thuộc vào pyVideoTrans.
+* Các dependency Python có license riêng của chúng. Khi đóng gói release, cần giữ `LICENSE`, `THIRD_PARTY_NOTICES.md`, và `FFMPEG_SOURCE_OFFER.md` để người dùng có thể kiểm tra license.
