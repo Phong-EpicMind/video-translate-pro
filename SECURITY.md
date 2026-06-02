@@ -21,6 +21,8 @@ Include:
 
 ## Secret Handling
 
-The app stores user credentials locally under `~/.translatedub_ai/` with restrictive file permissions. The configuration API returns only non-secret settings plus boolean "configured" flags, not stored Gemini API keys or Google Cloud service account JSON.
+The app stores Gemini API keys and Google Cloud service account JSON in macOS Keychain under the `com.phongho.translatedubai` service. The local `~/.translatedub_ai/config.json` file is reserved for non-secret preferences and is written with restrictive file permissions. If an older config file contains secrets, the app migrates them to Keychain and rewrites the file without those secret fields.
+
+The configuration API returns only non-secret settings plus boolean "configured" flags, not stored Gemini API keys or Google Cloud service account JSON.
 
 Never commit local `config.json`, Google Cloud service account JSON, API keys, temporary videos, generated audio, or app build artifacts.

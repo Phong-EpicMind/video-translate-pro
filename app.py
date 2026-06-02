@@ -5,6 +5,11 @@ import asyncio
 import uuid
 import shutil
 
+try:
+    import Security
+except Exception:
+    Security = None
+
 # Clean up PyInstaller dynamic library paths at startup so external subprocesses run in system environment
 if getattr(sys, 'frozen', False):
     for key in ['DYLD_LIBRARY_PATH', 'LD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH']:
@@ -40,6 +45,11 @@ import utils
 app = FastAPI(title="Video Translate Pro")
 
 LOCAL_CLIENT_HOSTS = {"127.0.0.1", "::1", "localhost"}
+KEYCHAIN_SERVICE = "com.phongho.translatedubai"
+SECRET_CONFIG_KEYS = {
+    "gemini_key": "gemini_api_key",
+    "google_cloud_credentials": "google_cloud_service_account_json",
+}
 
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -103,11 +113,70 @@ def save_config(config_data):
     except Exception:
         return False
 
+def _keychain_query(account: str) -> dict:
+    return {
+        Security.kSecClass: Security.kSecClassGenericPassword,
+        Security.kSecAttrService: KEYCHAIN_SERVICE,
+        Security.kSecAttrAccount: account,
+    }
+
+def keychain_available() -> bool:
+    return Security is not None
+
+def keychain_get(account: str) -> str:
+    if not keychain_available():
+        return ""
+
+    query = _keychain_query(account)
+    query[Security.kSecReturnData] = True
+    query[Security.kSecMatchLimit] = Security.kSecMatchLimitOne
+    status, data = Security.SecItemCopyMatching(query, None)
+    if status == Security.errSecItemNotFound:
+        return ""
+    if status != Security.errSecSuccess:
+        raise RuntimeError(f"Keychain read failed with status {status}.")
+    return bytes(data).decode("utf-8") if data is not None else ""
+
+def keychain_set(account: str, value: str) -> None:
+    if not keychain_available():
+        raise RuntimeError("macOS Keychain is not available.")
+
+    query = _keychain_query(account)
+    encoded_value = value.encode("utf-8")
+    status, _ = Security.SecItemAdd({**query, Security.kSecValueData: encoded_value}, None)
+    if status == Security.errSecDuplicateItem:
+        status = Security.SecItemUpdate(query, {Security.kSecValueData: encoded_value})
+    if status != Security.errSecSuccess:
+        raise RuntimeError(f"Keychain write failed with status {status}.")
+
+def get_secret(config_key: str) -> str:
+    return keychain_get(SECRET_CONFIG_KEYS[config_key])
+
+def set_secret(config_key: str, value: str) -> None:
+    keychain_set(SECRET_CONFIG_KEYS[config_key], value)
+
+def redact_config_secrets(config_data: dict) -> dict:
+    return {key: value for key, value in config_data.items() if key not in SECRET_CONFIG_KEYS}
+
+def migrate_config_secrets_to_keychain(config_data: dict) -> dict:
+    migrated = False
+    for config_key in SECRET_CONFIG_KEYS:
+        value = config_data.get(config_key)
+        if value:
+            set_secret(config_key, value)
+            migrated = True
+
+    if migrated:
+        config_data = redact_config_secrets(config_data)
+        save_config(config_data)
+    return config_data
+
 def public_config(config_data):
     """Return UI-safe settings without exposing stored credentials."""
+    config_data = migrate_config_secrets_to_keychain(config_data)
     return {
-        "has_gemini_key": bool(config_data.get("gemini_key")),
-        "has_google_cloud_credentials": bool(config_data.get("google_cloud_credentials")),
+        "has_gemini_key": bool(get_secret("gemini_key")),
+        "has_google_cloud_credentials": bool(get_secret("google_cloud_credentials")),
         "src_lang": config_data.get("src_lang", "auto"),
         "target_lang": config_data.get("target_lang", "vi"),
         "tts_engine": config_data.get("tts_engine", "gtts"),
@@ -164,18 +233,19 @@ async def get_config():
 
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
-    config = load_config()
+    config = migrate_config_secrets_to_keychain(load_config())
     incoming = data.model_dump()
     for key, value in incoming.items():
         if key in {"gemini_key", "google_cloud_credentials"}:
             if value:
-                config[key] = value
+                set_secret(key, value)
             continue
         config[key] = value
 
-    if not config.get("gemini_key"):
+    if not get_secret("gemini_key"):
         raise HTTPException(status_code=400, detail="Gemini API Key is required.")
 
+    config = redact_config_secrets(config)
     if save_config(config):
         return {"status": "success", "message": "Lưu cài đặt thành công!", "config": public_config(config)}
     else:
@@ -205,8 +275,8 @@ async def translate_progress(video_path: str, src_lang: str, target_lang: str):
             yield f"data: {json.dumps({'step': 'error', 'message': 'Không tìm thấy file video nguồn.'})}\n\n"
             return
             
-        config = load_config()
-        gemini_key = config.get("gemini_key")
+        config = migrate_config_secrets_to_keychain(load_config())
+        gemini_key = get_secret("gemini_key")
             
         if not gemini_key:
             yield f"data: {json.dumps({'step': 'error', 'message': 'Chưa nhập Gemini API Key.'})}\n\n"
@@ -316,7 +386,7 @@ async def dub_progress(req: DubbingRequest):
             yield f"data: {json.dumps({'step': 'error', 'message': 'Danh sách phụ đề trống.'})}\n\n"
             return
             
-        config = load_config()
+        config = migrate_config_secrets_to_keychain(load_config())
         
         video_filename = os.path.basename(video_path)
         base_name = os.path.splitext(video_filename)[0]
@@ -343,7 +413,7 @@ async def dub_progress(req: DubbingRequest):
             voice_config = {}
             if req.tts_engine == "google_cloud":
                 voice_config = {
-                    "credentials_json": config.get("google_cloud_credentials"),
+                    "credentials_json": get_secret("google_cloud_credentials"),
                     "voice_name": req.voice_name
                 }
                 

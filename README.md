@@ -103,12 +103,15 @@ Sau khi hoàn tất, tệp cài đặt **TranslateDub AI.app** sẽ xuất hiệ
 ## 🔒 Tiêu Chuẩn Bảo Mật Quốc Tế (Security & Privacy Standards)
 
 Ứng dụng tuân thủ nghiêm ngặt các quy tắc bảo mật của hệ thống macOS:
-1. **Phân quyền UNIX Tối thiểu (chmod 600 / 700):**
+1. **macOS Keychain cho secret:**
+   * Gemini API Key và Google Cloud Service Account JSON được lưu trong macOS Keychain dưới service `com.phongho.translatedubai`.
+   * Nếu phát hiện secret cũ trong `~/.translatedub_ai/config.json`, app sẽ tự chuyển sang Keychain và ghi lại file cấu hình không chứa secret.
+2. **Phân quyền UNIX Tối thiểu (chmod 600 / 700):**
    * Thư mục dữ liệu ứng dụng `~/.translatedub_ai/` được gán quyền `chmod 700` (chỉ chủ tài khoản được truy cập).
-   * File cấu hình khóa API `config.json` được tạo với quyền `chmod 600` (chỉ chủ tài khoản được đọc/ghi).
-2. **Không trả secret về giao diện:** API cấu hình chỉ trả trạng thái đã lưu key/credentials, không trả lại Gemini API Key hoặc Google Cloud Service Account JSON đã lưu.
-3. **WebKit Multiline Masking:** Ô dán Service Account JSON của Google Cloud được che giấu bằng mặt nạ chấm đĩa của macOS Safari engine để giảm rủi ro lộ khóa khi chia sẻ màn hình.
-4. **Môi trường cách ly Git (.gitignore):** Tệp cấu hình chứa API Key cục bộ và các thư mục video tạm được thêm vào danh sách bỏ qua của Git để giảm rủi ro vô tình tải dữ liệu nhạy cảm lên GitHub.
+   * File cấu hình non-secret `config.json` được tạo với quyền `chmod 600` (chỉ chủ tài khoản được đọc/ghi).
+3. **Không trả secret về giao diện:** API cấu hình chỉ trả trạng thái đã lưu key/credentials, không trả lại Gemini API Key hoặc Google Cloud Service Account JSON đã lưu.
+4. **WebKit Multiline Masking:** Ô dán Service Account JSON của Google Cloud được che giấu bằng mặt nạ chấm đĩa của macOS Safari engine để giảm rủi ro lộ khóa khi chia sẻ màn hình.
+5. **Môi trường cách ly Git (.gitignore):** Tệp cấu hình cục bộ và các thư mục video tạm được thêm vào danh sách bỏ qua của Git để giảm rủi ro vô tình tải dữ liệu nhạy cảm lên GitHub.
 
 ---
 
