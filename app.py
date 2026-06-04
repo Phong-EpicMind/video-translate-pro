@@ -51,6 +51,10 @@ SECRET_CONFIG_KEYS = {
     "gemini_key": "gemini_api_key",
     "google_cloud_credentials": "google_cloud_service_account_json",
 }
+SECRET_PRESENCE_KEYS = {
+    "gemini_key": "gemini",
+    "google_cloud_credentials": "google_cloud",
+}
 SECRET_PRESENCE_CONFIG_KEY = "secret_presence"
 _SECRET_CACHE = {}
 _SECRET_READ_ATTEMPTED = set()
@@ -185,12 +189,13 @@ def set_secret(config_key: str, value: str) -> None:
 
 def mark_secret_presence(config_data: dict, config_key: str, present: bool) -> None:
     presence = config_data.setdefault(SECRET_PRESENCE_CONFIG_KEY, {})
-    presence[config_key] = bool(present)
+    presence[SECRET_PRESENCE_KEYS[config_key]] = bool(present)
+    presence.pop(config_key, None)
 
 def secret_present(config_data: dict, config_key: str) -> bool:
     account = SECRET_CONFIG_KEYS[config_key]
     presence = config_data.get(SECRET_PRESENCE_CONFIG_KEY, {})
-    return bool(presence.get(config_key)) or bool(_SECRET_CACHE.get(account))
+    return bool(presence.get(SECRET_PRESENCE_KEYS[config_key])) or bool(presence.get(config_key)) or bool(_SECRET_CACHE.get(account))
 
 def redact_config_secrets(config_data: dict) -> dict:
     return {key: value for key, value in config_data.items() if key not in SECRET_CONFIG_KEYS}
