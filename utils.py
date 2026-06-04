@@ -434,6 +434,59 @@ def make_subtitles_srt(subtitles: list[dict], srt_path: str):
             text = sub.get("translated_text", "")
             f.write(f"{index}\n{start} --> {end}\n{text}\n\n")
 
+def _escape_subtitle_filter_path(srt_path: str) -> str:
+    return srt_path.replace(":", "\\:").replace("'", "'\\''")
+
+def export_subtitled_video(
+    video_path: str,
+    srt_path: str,
+    output_path: str,
+    burn_subtitles: bool = True,
+    log_callback=None,
+) -> bool:
+    """Export the original video with translated subtitles but without generating a dubbed audio track."""
+    if log_callback:
+        mode_label = "phụ đề cứng" if burn_subtitles else "phụ đề mềm"
+        log_callback(f"Đang tạo video chỉ có {mode_label}...")
+
+    if burn_subtitles:
+        escaped_srt = _escape_subtitle_filter_path(srt_path)
+        cmd = [
+            get_ffmpeg_path("ffmpeg"), "-y",
+            "-i", video_path,
+            "-vf", f"subtitles='{escaped_srt}'",
+            "-c:v", "libx264", "-preset", "fast",
+            "-c:a", "copy",
+            output_path,
+        ]
+    else:
+        cmd = [
+            get_ffmpeg_path("ffmpeg"), "-y",
+            "-i", video_path,
+            "-i", srt_path,
+            "-map", "0",
+            "-map", "1:0",
+            "-c", "copy",
+            "-c:s", "mov_text",
+            output_path,
+        ]
+
+    try:
+        if log_callback:
+            log_callback(f"Lệnh chạy: {' '.join(cmd)}")
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=get_clean_env())
+        if result.returncode != 0:
+            if log_callback:
+                log_callback(f"Lỗi xuất video phụ đề: {result.stderr}")
+            return False
+        if log_callback:
+            log_callback("Hoàn thành xuất video phụ đề thành công!")
+        return True
+    except Exception as e:
+        if log_callback:
+            log_callback(f"Lỗi hệ thống khi xuất video phụ đề: {e}")
+        return False
+
 def merge_dubbed_audio_to_video(
     video_path: str, 
     dubbed_audio_path: str, 
@@ -479,7 +532,7 @@ def merge_dubbed_audio_to_video(
         if burn_subtitles:
             if log_callback:
                 log_callback("Ghi phụ đề cứng (burn-in) vào video (cần thời gian mã hóa lại)...")
-            escaped_srt = srt_path.replace(":", "\\:").replace("'", "'\\''")
+            escaped_srt = _escape_subtitle_filter_path(srt_path)
             cmd.extend(["-vf", f"subtitles='{escaped_srt}'"])
             cmd.extend(["-c:v", "libx264", "-preset", "fast"])
         else:

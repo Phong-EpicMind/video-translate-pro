@@ -4,6 +4,7 @@ import json
 import asyncio
 import uuid
 import shutil
+import re
 
 try:
     import Security
@@ -190,13 +191,13 @@ def public_config(config_data):
 class ConfigUpdate(BaseModel):
     gemini_key: Optional[str] = None
     google_cloud_credentials: Optional[str] = None
-    src_lang: Optional[str] = "auto"
-    target_lang: Optional[str] = "vi"
-    tts_engine: Optional[str] = "gtts"
-    voice_name: Optional[str] = ""
-    base_speed: Optional[float] = 1.0
-    match_duration: Optional[bool] = True
-    output_dir: Optional[str] = ""
+    src_lang: Optional[str] = None
+    target_lang: Optional[str] = None
+    tts_engine: Optional[str] = None
+    voice_name: Optional[str] = None
+    base_speed: Optional[float] = None
+    match_duration: Optional[bool] = None
+    output_dir: Optional[str] = None
 
 class SubtitleItem(BaseModel):
     index: int
@@ -215,6 +216,46 @@ class DubbingRequest(BaseModel):
     voice_name: Optional[str] = ""
     base_speed: Optional[float] = 1.0
     match_duration: Optional[bool] = True
+    output_mode: Optional[str] = "dubbed" # 'dubbed' or 'subtitles_only'
+    source_filename: Optional[str] = ""
+
+def sanitize_filename_stem(filename: str) -> str:
+    """Create a readable, filesystem-safe stem while preserving Unicode letters."""
+    raw_stem = os.path.splitext(os.path.basename(filename or ""))[0].strip()
+    safe_stem = re.sub(r"[^\w.\- ()]+", "_", raw_stem, flags=re.UNICODE)
+    safe_stem = re.sub(r"_+", "_", safe_stem).strip(" ._-")
+    return (safe_stem or "video")[:90]
+
+def unique_output_path(directory: str, filename: str) -> str:
+    path = os.path.join(directory, filename)
+    if not os.path.exists(path):
+        return path
+
+    stem, ext = os.path.splitext(filename)
+    for counter in range(2, 1000):
+        candidate = os.path.join(directory, f"{stem}_{counter}{ext}")
+        if not os.path.exists(candidate):
+            return candidate
+
+    return os.path.join(directory, f"{stem}_{uuid.uuid4().hex[:8]}{ext}")
+
+def resolve_output_path(base_filename: str) -> str:
+    config = migrate_config_secrets_to_keychain(load_config())
+    output_dir = config.get("output_dir", "").strip()
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        if os.path.isdir(output_dir):
+            return unique_output_path(output_dir, base_filename)
+    return unique_output_path(TEMP_DIR, base_filename)
+
+def preview_url_for_output(output_video_path: str) -> str:
+    output_video_filename = os.path.basename(output_video_path)
+    if os.path.abspath(os.path.dirname(output_video_path)) == os.path.abspath(TEMP_DIR):
+        return f"/temp/{output_video_filename}"
+
+    preview_filename = f"preview_{uuid.uuid4().hex}_{output_video_filename}"
+    shutil.copy2(output_video_path, os.path.join(TEMP_DIR, preview_filename))
+    return f"/temp/{preview_filename}"
 
 # Page routes
 @app.get("/", response_class=HTMLResponse)
@@ -234,7 +275,7 @@ async def get_config():
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
     config = migrate_config_secrets_to_keychain(load_config())
-    incoming = data.model_dump()
+    incoming = data.model_dump(exclude_unset=True)
     for key, value in incoming.items():
         if key in {"gemini_key", "google_cloud_credentials"}:
             if value:
@@ -255,8 +296,9 @@ async def update_config(data: ConfigUpdate):
 async def upload_video(file: UploadFile = File(...)):
     """Upload a video file to the temp directory"""
     try:
-        file_ext = os.path.splitext(file.filename)[1]
-        unique_filename = f"video_{uuid.uuid4().hex}{file_ext}"
+        file_ext = os.path.splitext(file.filename or "")[1] or ".mp4"
+        safe_stem = sanitize_filename_stem(file.filename or "video")
+        unique_filename = f"{safe_stem}_{uuid.uuid4().hex[:10]}{file_ext.lower()}"
         filepath = os.path.join(TEMP_DIR, unique_filename)
         
         with open(filepath, "wb") as buffer:
@@ -387,9 +429,9 @@ async def dub_progress(req: DubbingRequest):
             return
             
         config = migrate_config_secrets_to_keychain(load_config())
-        
-        video_filename = os.path.basename(video_path)
-        base_name = os.path.splitext(video_filename)[0]
+        output_mode = req.output_mode if req.output_mode in {"dubbed", "subtitles_only"} else "dubbed"
+        base_name = sanitize_filename_stem(req.source_filename or video_path)
+        output_suffix = "subtitled" if output_mode == "subtitles_only" else "translated"
         
         # Temp folder for subtitle audio chunks
         chunks_dir = os.path.join(TEMP_DIR, f"chunks_{uuid.uuid4().hex}")
@@ -397,15 +439,68 @@ async def dub_progress(req: DubbingRequest):
         
         dubbed_audio_path = os.path.join(TEMP_DIR, f"{base_name}_dubbed.mp3")
         srt_path = os.path.join(TEMP_DIR, f"{base_name}_subtitles.srt")
-        output_video_filename = f"{base_name}_translated.mp4"
-        
-        output_dir = config.get("output_dir", "").strip()
-        if output_dir and os.path.isdir(output_dir):
-            output_video_path = os.path.join(output_dir, output_video_filename)
-        else:
-            output_video_path = os.path.join(TEMP_DIR, output_video_filename)
+        output_video_path = resolve_output_path(f"{base_name}_{output_suffix}.mp4")
         
         try:
+            sub_dicts = [
+                {
+                    "index": sub.index,
+                    "start_ms": sub.start_ms,
+                    "end_ms": sub.end_ms,
+                    "translated_text": sub.translated_text,
+                }
+                for sub in subtitles
+            ]
+            utils.make_subtitles_srt(sub_dicts, srt_path)
+
+            if output_mode == "subtitles_only":
+                yield f"data: {json.dumps({'step': 'subtitle', 'status': 'processing', 'message': f'Đang xuất video chỉ có phụ đề cho {len(subtitles)} dòng dịch...'})}\n\n"
+                import queue
+                import threading
+
+                subtitle_queue = queue.Queue()
+                subtitle_container = {"success": False, "error": None}
+
+                def run_subtitle_export_thread():
+                    def callback(msg):
+                        subtitle_queue.put(msg)
+                    try:
+                        subtitle_container["success"] = utils.export_subtitled_video(
+                            video_path=video_path,
+                            srt_path=srt_path,
+                            output_path=output_video_path,
+                            burn_subtitles=req.burn_subtitles,
+                            log_callback=callback,
+                        )
+                    except Exception as ex:
+                        subtitle_container["error"] = str(ex)
+                        subtitle_container["success"] = False
+                    finally:
+                        subtitle_queue.put(None)
+
+                subtitle_thread = threading.Thread(target=run_subtitle_export_thread, daemon=True)
+                subtitle_thread.start()
+
+                while subtitle_thread.is_alive() or not subtitle_queue.empty():
+                    try:
+                        msg = subtitle_queue.get(block=False)
+                        if msg is None:
+                            break
+                        yield f"data: {json.dumps({'step': 'merge', 'status': 'processing', 'message': msg})}\n\n"
+                    except queue.Empty:
+                        yield ": ping\n\n"
+                        await asyncio.sleep(0.5)
+
+                if not subtitle_container["success"]:
+                    err_msg = subtitle_container["error"] or "Lỗi xuất video phụ đề chưa xác định."
+                    yield f"data: {json.dumps({'step': 'error', 'message': f'Thất bại khi xuất video phụ đề: {err_msg}'})}\n\n"
+                    return
+
+                shutil.rmtree(chunks_dir, ignore_errors=True)
+                preview_url = preview_url_for_output(output_video_path)
+                yield f"data: {json.dumps({'step': 'merge', 'status': 'done', 'message': 'Hoàn thành xuất video chỉ có phụ đề!', 'preview_url': preview_url, 'absolute_path': output_video_path, 'output_mode': output_mode})}\n\n"
+                return
+
             # 1. Voice Synthesis (TTS)
             yield f"data: {json.dumps({'step': 'tts', 'status': 'processing', 'message': f'Bắt đầu lồng tiếng cho {len(subtitles)} đoạn phụ đề sử dụng động cơ {req.tts_engine.upper()}...'})}\n\n"
             
@@ -480,10 +575,7 @@ async def dub_progress(req: DubbingRequest):
             yield f"data: {json.dumps({'step': 'tts', 'status': 'done', 'message': 'Lồng tiếng và đồng bộ hóa âm thanh thành công!'})}\n\n"
             await asyncio.sleep(0.5)
             
-            # 3. Create SRT subtitle file
-            utils.make_subtitles_srt(sub_dicts, srt_path)
-            
-            # 4. Merge Audio and Video
+            # 3. Merge Audio and Video
             yield f"data: {json.dumps({'step': 'merge', 'status': 'processing', 'message': 'Đang mix âm thanh lồng tiếng với video gốc...'})}\n\n"
             
             import queue
@@ -534,16 +626,9 @@ async def dub_progress(req: DubbingRequest):
             # Clean up chunks
             shutil.rmtree(chunks_dir, ignore_errors=True)
             
-            # Copy to temp for browser preview if using a custom output dir
-            if output_dir and os.path.isdir(output_dir):
-                try:
-                    shutil.copy2(output_video_path, os.path.join(TEMP_DIR, output_video_filename))
-                except Exception as e:
-                    print(f"Error copying preview to temp: {e}")
-            
             # Send relative preview URL (since /temp is mounted)
-            preview_url = f"/temp/{output_video_filename}"
-            yield f"data: {json.dumps({'step': 'merge', 'status': 'done', 'message': 'Hoàn thành lồng tiếng & ghép phụ đề xuất sắc!', 'preview_url': preview_url, 'absolute_path': output_video_path})}\n\n"
+            preview_url = preview_url_for_output(output_video_path)
+            yield f"data: {json.dumps({'step': 'merge', 'status': 'done', 'message': 'Hoàn thành lồng tiếng & ghép phụ đề!', 'preview_url': preview_url, 'absolute_path': output_video_path, 'output_mode': output_mode})}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'step': 'error', 'message': f'Lỗi hệ thống: {e}'})}\n\n"

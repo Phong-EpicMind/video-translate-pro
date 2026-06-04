@@ -1,6 +1,8 @@
 // State Variables
 let currentVideoPath = "";
 let currentSubtitles = [];
+let currentSourceFilename = "";
+let lastOutputPath = "";
 let hasSavedGeminiKey = false;
 let hasSavedGoogleCloudCredentials = false;
 
@@ -93,12 +95,22 @@ const editorVideoFilename = document.getElementById("editorVideoFilename");
 const subtitleTableBody = document.getElementById("subtitleTableBody");
 const cancelDubBtn = document.getElementById("cancelDubBtn");
 const startDubBtn = document.getElementById("startDubBtn");
+const exportSubtitlesBtn = document.getElementById("exportSubtitlesBtn");
 
 const finalVideoPlayer = document.getElementById("finalVideoPlayer");
 const finalVideoPath = document.getElementById("finalVideoPath");
-const downloadVideoBtn = document.getElementById("downloadVideoBtn");
+const revealOutputBtn = document.getElementById("revealOutputBtn");
+const copyPathBtn = document.getElementById("copyPathBtn");
 const startOverBtn = document.getElementById("startOverBtn");
 const headerStartOverBtn = document.getElementById("headerStartOverBtn");
+const completeTitle = document.getElementById("completeTitle");
+const completeDescription = document.getElementById("completeDescription");
+const batchQueuePanel = document.getElementById("batchQueuePanel");
+const batchQueueList = document.getElementById("batchQueueList");
+const batchQueueSummary = document.getElementById("batchQueueSummary");
+const batchProcessingPanel = document.getElementById("batchProcessingPanel");
+const batchProcessingList = document.getElementById("batchProcessingList");
+const batchProcessingSummary = document.getElementById("batchProcessingSummary");
 
 // Sidebar configuration elements
 const geminiKey = document.getElementById("geminiKey");
@@ -211,17 +223,17 @@ function setupEventListeners() {
     uploadBox.addEventListener("drop", (e) => {
         e.preventDefault();
         uploadBox.classList.remove("dragover");
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFileUpload(files[0]);
-        }
+        handleSelectedFiles(e.dataTransfer.files);
+    });
+
+    videoFileInput.addEventListener("click", () => {
+        videoFileInput.value = "";
     });
 
     // File Input change
     videoFileInput.addEventListener("change", (e) => {
-        if (e.target.files.length > 0) {
-            handleFileUpload(e.target.files[0]);
-        }
+        handleSelectedFiles(e.target.files);
+        videoFileInput.value = "";
     });
 
     // Local path submission
@@ -233,6 +245,7 @@ function setupEventListeners() {
         }
         saveConfigSilently();
         currentVideoPath = path;
+        currentSourceFilename = path.split("/").pop();
         startTranslationPipeline(path);
     });
 
@@ -244,6 +257,17 @@ function setupEventListeners() {
     });
 
     startDubBtn.addEventListener("click", startDubbingPipeline);
+    if (exportSubtitlesBtn) {
+        exportSubtitlesBtn.addEventListener("click", startSubtitleOnlyPipeline);
+    }
+
+    if (revealOutputBtn) {
+        revealOutputBtn.addEventListener("click", revealLastOutputInFinder);
+    }
+
+    if (copyPathBtn) {
+        copyPathBtn.addEventListener("click", copyLastOutputPath);
+    }
 
     const resetAppFlow = () => {
         switchState(dropzoneState);
@@ -253,7 +277,13 @@ function setupEventListeners() {
         editorVideoPlayer.src = "";
         currentVideoPath = "";
         currentSubtitles = [];
+        currentSourceFilename = "";
+        lastOutputPath = "";
         localVideoPath.value = "";
+        videoFileInput.value = "";
+        subtitleTableBody.innerHTML = "";
+        consoleBody.innerHTML = '<div class="console-line system">[SYSTEM] Hệ thống đã sẵn sàng...</div>';
+        renderBatchQueue([]);
     };
 
     startOverBtn.addEventListener("click", resetAppFlow);
@@ -289,6 +319,48 @@ function showToast(message) {
     setTimeout(() => {
         toast.classList.remove("show");
     }, 3000);
+}
+
+function renderBatchQueue(items) {
+    const targets = [
+        { panel: batchQueuePanel, list: batchQueueList, summary: batchQueueSummary },
+        { panel: batchProcessingPanel, list: batchProcessingList, summary: batchProcessingSummary }
+    ].filter(target => target.panel && target.list && target.summary);
+    if (targets.length === 0) return;
+
+    if (!items || items.length === 0) {
+        targets.forEach(target => {
+            target.panel.style.display = "none";
+            target.list.innerHTML = "";
+            target.summary.textContent = "0 video";
+        });
+        return;
+    }
+
+    const doneCount = items.filter(item => item.status === "done").length;
+    const listHtml = items.map(item => {
+        const iconMap = {
+            queued: "fa-clock",
+            upload: "fa-cloud-arrow-up",
+            translate: "fa-language",
+            export: "fa-compact-disc",
+            done: "fa-circle-check",
+            error: "fa-circle-exclamation",
+        };
+        const icon = iconMap[item.status] || "fa-clock";
+        return `
+            <div class="batch-queue-item ${item.status}">
+                <i class="fa-solid ${icon}"></i>
+                <span class="batch-name">${escapeHtml(item.name)}</span>
+                <span class="batch-status">${escapeHtml(item.label)}</span>
+            </div>
+        `;
+    }).join("");
+    targets.forEach(target => {
+        target.panel.style.display = "block";
+        target.summary.textContent = `${doneCount}/${items.length} xong`;
+        target.list.innerHTML = listHtml;
+    });
 }
 
 // Load configurations from API
@@ -382,7 +454,8 @@ async function saveConfigSilently() {
         target_lang: targetLang.value,
         voice_name: voiceName.value,
         base_speed: parseFloat(baseSpeed.value),
-        match_duration: matchDuration.checked
+        match_duration: matchDuration.checked,
+        output_dir: outputDir.value.trim()
     };
     if (!data.gemini_key && !hasSavedGeminiKey) return;
     try {
@@ -434,10 +507,38 @@ function logToConsole(message, type = "system") {
 }
 
 // Upload file to server
-async function handleFileUpload(file) {
-    // Verify file exists
-    if (!file) return;
+function handleSelectedFiles(fileList) {
+    const files = Array.from(fileList || []).filter(file => file && file.type.startsWith("video/"));
+    if (files.length === 0) return;
+    if (files.length > 1) {
+        startBatchPipeline(files);
+        return;
+    }
+    handleFileUpload(files[0]);
+}
 
+async function uploadVideoFile(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData
+    });
+
+    if (!response.ok) {
+        throw new Error("Không thể tải file lên.");
+    }
+
+    const data = await response.json();
+    if (data.status !== "success") {
+        throw new Error(data.detail || "Tải file thất bại.");
+    }
+    return data;
+}
+
+async function handleFileUpload(file) {
+    if (!file) return;
     if (!geminiKey.value.trim() && !hasSavedGeminiKey) {
         showToast("Vui lòng lưu Gemini API Key ở thanh bên trước!");
         return;
@@ -450,31 +551,12 @@ async function handleFileUpload(file) {
     logToConsole(`Bắt đầu tải file: ${file.name} (${Math.round(file.size / 1024 / 1024)} MB)...`, "info");
     processingProgressBar.style.width = "5%";
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-        const response = await fetch("/api/upload", {
-            method: "POST",
-            body: formData
-        });
-        
-        if (!response.ok) {
-            throw new Error("Không thể tải file lên.");
-        }
-        
-        const data = await response.json();
-        if (data.status === "success") {
-            logToConsole(`Đã tải video thành công lên: ${data.video_path}`, "success");
-            currentVideoPath = data.video_path;
-            
-            // Start process
-            startTranslationPipeline(data.video_path);
-        } else {
-            logToConsole(`Tải file thất bại: ${data.detail}`, "error");
-            showToast("Có lỗi xảy ra khi tải file.");
-            switchState(dropzoneState);
-        }
+        const data = await uploadVideoFile(file);
+        logToConsole(`Đã tải video thành công lên: ${data.video_path}`, "success");
+        currentVideoPath = data.video_path;
+        currentSourceFilename = data.filename || file.name;
+        startTranslationPipeline(data.video_path);
     } catch (e) {
         logToConsole(`Lỗi tải video: ${e.message}`, "error");
         showToast("Lỗi kết nối máy chủ.");
@@ -583,6 +665,118 @@ function startTranslationPipeline(videoPath) {
     };
 }
 
+function translateVideoToSubtitles(videoPath) {
+    return new Promise((resolve, reject) => {
+        const src = srcLang.value;
+        const target = targetLang.value;
+        const sseUrl = `/api/translate/progress?video_path=${encodeURIComponent(videoPath)}&src_lang=${src}&target_lang=${target}`;
+        const eventSource = new EventSource(sseUrl);
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.message) {
+                logToConsole(data.message, data.step === "error" ? "error" : "system");
+            }
+            if (data.step === "transcribe" && data.status === "done") {
+                eventSource.close();
+                resolve(data.subtitles || []);
+            } else if (data.step === "error") {
+                eventSource.close();
+                reject(new Error(data.message || "Lỗi dịch thuật."));
+            }
+        };
+
+        eventSource.onerror = function() {
+            eventSource.close();
+            reject(new Error("Mất kết nối máy chủ khi dịch video."));
+        };
+    });
+}
+
+async function startBatchPipeline(files) {
+    if (!geminiKey.value.trim() && !hasSavedGeminiKey) {
+        showToast("Vui lòng lưu Gemini API Key ở thanh bên trước!");
+        return;
+    }
+
+    saveConfigSilently();
+    const items = files.map(file => ({ name: file.name, status: "queued", label: "Đang chờ" }));
+    renderBatchQueue(items);
+
+    switchState(processingState);
+    resetPipelineFlowchart();
+    consoleBody.innerHTML = "";
+    pipelineTitle.innerHTML = '<i class="fa-solid fa-list-check"></i> Đang xử lý batch video...';
+    processingProgressBar.style.width = "3%";
+    document.getElementById("step_init").className = "flow-step active";
+    logToConsole(`Bắt đầu batch ${files.length} video. App sẽ xử lý tuần tự để ổn định tài nguyên.`, "info");
+
+    let lastResult = null;
+    let successCount = 0;
+
+    for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const item = items[index];
+        try {
+            item.status = "upload";
+            item.label = "Đang upload";
+            renderBatchQueue(items);
+            logToConsole(`[${index + 1}/${files.length}] Upload ${file.name}`, "info");
+            const upload = await uploadVideoFile(file);
+
+            item.status = "translate";
+            item.label = "Đang dịch";
+            renderBatchQueue(items);
+            document.getElementById("step_extract").className = "flow-step active";
+            const subtitles = await translateVideoToSubtitles(upload.video_path);
+            if (!subtitles.length) throw new Error("Không có phụ đề sau khi dịch.");
+
+            item.status = "export";
+            item.label = "Đang xuất";
+            renderBatchQueue(items);
+            document.getElementById("step_assemble").className = "flow-step active";
+            lastResult = await streamVideoExport({
+                video_path: upload.video_path,
+                source_filename: upload.filename || file.name,
+                subtitles,
+                output_mode: "dubbed",
+                original_vol: parseFloat(originalVol.value),
+                dub_vol: parseFloat(dubVol.value),
+                burn_subtitles: burnSubtitles.checked,
+                tts_engine: ttsEngine.value,
+                voice_name: voiceName.value,
+                base_speed: parseFloat(baseSpeed.value),
+                match_duration: matchDuration.checked
+            });
+
+            successCount += 1;
+            item.status = "done";
+            item.label = "Hoàn tất";
+            renderBatchQueue(items);
+            processingProgressBar.style.width = `${Math.round(((index + 1) / files.length) * 100)}%`;
+        } catch (e) {
+            item.status = "error";
+            item.label = "Lỗi";
+            renderBatchQueue(items);
+            logToConsole(`[${index + 1}/${files.length}] ${file.name}: ${e.message}`, "error");
+        }
+    }
+
+    document.getElementById("step_init").className = "flow-step success";
+    document.getElementById("step_extract").className = "flow-step success";
+    document.getElementById("step_transcribe").className = "flow-step success";
+    document.getElementById("step_assemble").className = successCount > 0 ? "flow-step success" : "flow-step error";
+
+    if (lastResult) {
+        revealCompletePanel(lastResult.preview_url, lastResult.absolute_path, {
+            title: "Batch Video Hoàn Tất",
+            description: `Đã xử lý xong ${successCount}/${files.length} video. File preview bên dưới là video hoàn tất gần nhất.`
+        });
+    } else {
+        showToast("Batch chưa xuất được video nào.");
+    }
+}
+
 // Render Subtitle Editor Grid
 function initSubtitleEditor(subtitles) {
     switchState(subtitleEditorState);
@@ -602,7 +796,7 @@ function initSubtitleEditor(subtitles) {
     const filenameIcon = document.createElement("i");
     filenameIcon.className = "fa-solid fa-video";
     editorVideoFilename.appendChild(filenameIcon);
-    editorVideoFilename.appendChild(document.createTextNode(` ${currentVideoPath.split("/").pop()}`));
+    editorVideoFilename.appendChild(document.createTextNode(` ${currentSourceFilename || currentVideoPath.split("/").pop()}`));
     
     subtitles.forEach(sub => {
         const tr = document.createElement("tr");
@@ -659,7 +853,7 @@ function msToTimeStr(ms) {
     const minutes = Math.floor((ms % 3600000) / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
     const milliseconds = ms % 1000;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
 }
 
 // Convert HH:MM:SS.mmm to Milliseconds
@@ -683,23 +877,20 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
-// Start Dubbing & final video composition (fetch POST Stream reading)
-async function startDubbingPipeline() {
-    // Collect edited subtitles from grid
+function collectEditedSubtitles() {
     const subsPayload = [];
     const rows = subtitleTableBody.querySelectorAll("tr");
-    
     let timeParseError = false;
-    
+
     rows.forEach(row => {
         const index = parseInt(row.querySelector(".subtitle-index").textContent);
         const startVal = row.querySelector(".sub-start-input").value.trim();
         const endVal = row.querySelector(".sub-end-input").value.trim();
         const textVal = row.querySelector(".sub-trans-input").value.trim();
-        
+
         const start_ms = timeStrToMs(startVal);
         const end_ms = timeStrToMs(endVal);
-        
+
         if (start_ms >= end_ms && !timeParseError) {
             timeParseError = true;
             showToast(`Lỗi: Dòng ${index} có thời gian bắt đầu lớn hơn hoặc bằng thời gian kết thúc!`);
@@ -716,33 +907,117 @@ async function startDubbingPipeline() {
             translated_text: textVal
         });
     });
-    
-    if (timeParseError) return;
+
+    if (timeParseError) return null;
+    return subsPayload;
+}
+
+async function streamVideoExport(payload) {
+    const response = await fetch("/api/dub/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error("Không thể khởi động luồng xuất video.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            if (!line.trim().startsWith("data: ")) continue;
+            const data = JSON.parse(line.trim().slice(6));
+
+            if (data.step === "subtitle") {
+                logToConsole(data.message, data.status === "done" ? "success" : "system");
+                processingProgressBar.style.width = "70%";
+            } else if (data.step === "tts") {
+                if (data.status === "processing") {
+                    logToConsole(data.message, "system");
+                    let currentW = parseFloat(processingProgressBar.style.width);
+                    if (currentW < 75) {
+                        processingProgressBar.style.width = `${currentW + 0.5}%`;
+                    }
+                } else if (data.status === "done") {
+                    logToConsole(data.message, "success");
+                    processingProgressBar.style.width = "80%";
+                }
+            } else if (data.step === "merge") {
+                if (data.status === "processing") {
+                    logToConsole(data.message, "system");
+                    processingProgressBar.style.width = "88%";
+                } else if (data.status === "done") {
+                    document.getElementById("step_assemble").className = "flow-step success";
+                    const flowLines = document.querySelectorAll(".flow-line");
+                    if (flowLines.length >= 3) flowLines[2].className = "flow-line success";
+                    logToConsole(data.message, "success");
+                    processingProgressBar.style.width = "100%";
+                    return data;
+                }
+            } else if (data.step === "error") {
+                logToConsole(data.message, "error");
+                document.getElementById("step_assemble").className = "flow-step error";
+                throw new Error(data.message || "Lỗi xuất video.");
+            }
+        }
+    }
+
+    throw new Error("Luồng xuất video kết thúc trước khi trả kết quả.");
+}
+
+// Start Dubbing & final video composition (fetch POST Stream reading)
+async function startDubbingPipeline() {
+    await startExportPipeline("dubbed");
+}
+
+async function startSubtitleOnlyPipeline() {
+    await startExportPipeline("subtitles_only");
+}
+
+async function startExportPipeline(outputMode) {
+    const subsPayload = collectEditedSubtitles();
+    if (!subsPayload) return;
 
     editorVideoPlayer.pause();
     switchState(processingState);
     resetPipelineFlowchart();
     consoleBody.innerHTML = "";
-    pipelineTitle.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lồng tiếng & ghép video...';
-    
+    const isSubtitleOnly = outputMode === "subtitles_only";
+    pipelineTitle.innerHTML = isSubtitleOnly
+        ? '<i class="fa-solid fa-closed-captioning"></i> Đang xuất video chỉ có phụ đề...'
+        : '<i class="fa-solid fa-spinner fa-spin"></i> Đang lồng tiếng & ghép video...';
+
     // Mark previous steps as success
     document.getElementById("step_init").className = "flow-step success";
     document.getElementById("step_extract").className = "flow-step success";
     document.getElementById("step_transcribe").className = "flow-step success";
-    
+
     const flowLines = document.querySelectorAll(".flow-line");
     if (flowLines.length >= 2) {
         flowLines[0].className = "flow-line success";
         flowLines[1].className = "flow-line success";
     }
-    
+
     document.getElementById("step_assemble").className = "flow-step active";
-    logToConsole("Khởi chạy luồng lồng tiếng và mix âm thanh...", "info");
+    logToConsole(isSubtitleOnly ? "Khởi chạy luồng xuất video phụ đề..." : "Khởi chạy luồng lồng tiếng và mix âm thanh...", "info");
     processingProgressBar.style.width = "40%";
 
     const payload = {
         video_path: currentVideoPath,
+        source_filename: currentSourceFilename,
         subtitles: subsPayload,
+        output_mode: outputMode,
         original_vol: parseFloat(originalVol.value),
         dub_vol: parseFloat(dubVol.value),
         burn_subtitles: burnSubtitles.checked,
@@ -753,82 +1028,62 @@ async function startDubbingPipeline() {
     };
 
     try {
-        // Since EventSource doesn't support POST, we fetch and parse the stream reader manually!
-        const response = await fetch("/api/dub/progress", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            throw new Error("Không thể khởi động luồng lồng tiếng.");
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop(); // keep last chunk in buffer
-
-            for (const line of lines) {
-                if (line.trim().startsWith("data: ")) {
-                    const data = JSON.parse(line.trim().slice(6));
-                    
-                    if (data.step === "tts") {
-                        if (data.status === "processing") {
-                            logToConsole(data.message, "system");
-                            // Scale progress bar based on tts steps
-                            let currentW = parseFloat(processingProgressBar.style.width);
-                            if (currentW < 75) {
-                                processingProgressBar.style.width = `${currentW + 0.5}%`;
-                            }
-                        } else if (data.status === "done") {
-                            logToConsole(data.message, "success");
-                            processingProgressBar.style.width = "80%";
-                        }
-                    } 
-                    else if (data.step === "merge") {
-                        if (data.status === "processing") {
-                            logToConsole(data.message, "system");
-                            processingProgressBar.style.width = "88%";
-                        } else if (data.status === "done") {
-                            document.getElementById("step_assemble").className = "flow-step success";
-                            const flowLines = document.querySelectorAll(".flow-line");
-                            if (flowLines.length >= 3) flowLines[2].className = "flow-line success";
-                            logToConsole(data.message, "success");
-                            processingProgressBar.style.width = "100%";
-                            
-                            // Dubbing and Merging finished! Reveal preview panel
-                            setTimeout(() => {
-                                revealCompletePanel(data.preview_url, data.absolute_path);
-                            }, 1000);
-                        }
-                    } 
-                    else if (data.step === "error") {
-                        logToConsole(data.message, "error");
-                        showToast("Lỗi xử lý lồng tiếng.");
-                        document.getElementById("step_assemble").className = "flow-step error";
-                    }
-                }
-            }
-        }
+        const data = await streamVideoExport(payload);
+        setTimeout(() => {
+            revealCompletePanel(data.preview_url, data.absolute_path, {
+                title: isSubtitleOnly ? "Video Phụ Đề Hoàn Tất" : "Video Lồng Tiếng Hoàn Tất",
+                description: isSubtitleOnly
+                    ? "Ứng dụng đã xuất video không lồng tiếng, chỉ dùng phụ đề dịch."
+                    : "Ứng dụng đã hoàn thành dịch thuật, lồng tiếng và xuất video."
+            });
+        }, 1000);
     } catch (e) {
-        logToConsole(`Lỗi kết nối lồng tiếng: ${e.message}`, "error");
-        showToast("Lỗi hệ thống lồng tiếng.");
+        logToConsole(`Lỗi xuất video: ${e.message}`, "error");
+        showToast("Lỗi hệ thống khi xuất video.");
         document.getElementById("step_assemble").className = "flow-step error";
     }
 }
 
 // Show completed preview panel
-function revealCompletePanel(previewUrl, absolutePath) {
+function revealCompletePanel(previewUrl, absolutePath, options = {}) {
     switchState(completeState);
     finalVideoPlayer.src = previewUrl;
     finalVideoPath.textContent = absolutePath;
-    downloadVideoBtn.href = previewUrl;
+    lastOutputPath = absolutePath;
+    if (completeTitle) {
+        completeTitle.textContent = options.title || "Xuất Video Hoàn Tất";
+    }
+    if (completeDescription) {
+        completeDescription.textContent = options.description || "Ứng dụng đã hoàn thành xử lý và lưu video vào thư mục đã chọn.";
+    }
+}
+
+async function revealLastOutputInFinder() {
+    if (!lastOutputPath) {
+        showToast("Chưa có file xuất ra.");
+        return;
+    }
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.reveal_in_finder) {
+        const result = await window.pywebview.api.reveal_in_finder(lastOutputPath);
+        if (result && result.ok) {
+            showToast("Đã mở Finder tại file xuất ra.");
+        } else {
+            showToast(result && result.error ? result.error : "Không mở được Finder.");
+        }
+    } else {
+        showToast("Chạy bản desktop để dùng nút Hiện trong Finder.");
+    }
+}
+
+async function copyLastOutputPath() {
+    if (!lastOutputPath) {
+        showToast("Chưa có file xuất ra.");
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(lastOutputPath);
+        showToast("Đã sao chép đường dẫn file.");
+    } catch (e) {
+        showToast("Không thể sao chép tự động. Bạn có thể bôi đen đường dẫn để copy.");
+    }
 }

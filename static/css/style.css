@@ -367,6 +367,18 @@ input[type="range"]::-webkit-slider-thumb:hover {
     border-color: var(--text-secondary);
 }
 
+.btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
+}
+
+.btn-success:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+    filter: brightness(1.05);
+}
+
 .btn-block {
     display: flex;
     width: 100%;
@@ -555,6 +567,79 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .local-path-input input {
     flex: 1;
+}
+
+.batch-queue-panel {
+    width: 100%;
+    max-width: 560px;
+    margin-top: 22px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+}
+
+.batch-queue-panel.compact {
+    max-width: none;
+    margin-top: 0;
+}
+
+.batch-queue-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.batch-queue-list {
+    max-height: 160px;
+    overflow: auto;
+}
+
+.batch-queue-item {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.batch-queue-item:last-child {
+    border-bottom: 0;
+}
+
+.batch-queue-item .batch-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.batch-queue-item .batch-status {
+    color: var(--text-muted);
+}
+
+.batch-queue-item.done i,
+.batch-queue-item.done .batch-status {
+    color: var(--success);
+}
+
+.batch-queue-item.error i,
+.batch-queue-item.error .batch-status {
+    color: var(--error);
+}
+
+.batch-queue-item.upload i,
+.batch-queue-item.translate i,
+.batch-queue-item.export i {
+    color: var(--primary);
 }
 
 /* State 2: Processing Flowchart & Console */
@@ -923,8 +1008,16 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .editor-actions {
     display: flex;
     justify-content: space-between;
+    gap: 16px;
     border-top: 1px solid var(--border-color);
     padding-top: 24px;
+}
+
+.editor-primary-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 /* State 4: Complete and Preview Card */
@@ -1003,10 +1096,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: flex;
     gap: 16px;
     width: 100%;
+    flex-wrap: wrap;
 }
 
 .complete-actions .btn {
     flex: 1;
+    min-width: 160px;
 }
 
 /* Toast Message */
@@ -1032,4 +1127,79 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .toast.show {
     transform: translateY(0);
     opacity: 1;
+}
+
+@media (max-width: 900px) {
+    .app-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        max-height: none;
+        position: relative;
+    }
+
+    .sidebar-nav {
+        max-height: 420px;
+    }
+
+    .main-content {
+        height: auto;
+        min-height: 100vh;
+        padding: 24px;
+    }
+
+    .app-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .workspace-card {
+        min-height: 640px;
+        border-radius: 12px;
+    }
+
+    .workspace-state {
+        padding: 24px;
+    }
+
+    .upload-box {
+        padding: 28px 18px;
+        text-align: center;
+    }
+
+    .local-path-input,
+    .editor-actions,
+    .editor-primary-actions,
+    .complete-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .editor-workspace {
+        flex-direction: column;
+    }
+
+    .video-preview-pane {
+        width: 100%;
+    }
+
+    .pipeline-flow {
+        align-items: flex-start;
+        gap: 8px;
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+
+    .flow-step {
+        min-width: 74px;
+    }
+
+    .flow-line {
+        min-width: 24px;
+        flex: 0 0 24px;
+    }
 }

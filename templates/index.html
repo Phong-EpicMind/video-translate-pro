@@ -41,12 +41,12 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="outputDir">Thư mục lưu Video lồng tiếng</label>
+                        <label for="outputDir">Thư mục lưu video xuất ra</label>
                         <div class="input-password-wrapper">
                             <input type="text" id="outputDir" placeholder="Đường dẫn thư mục, ví dụ: /Users/.../Desktop" value="{{ config.output_dir or '' }}">
                             <button type="button" id="selectOutputDirBtn" class="btn-toggle-eye" style="right: 10px;" title="Chọn thư mục"><i class="fa-solid fa-folder-open"></i></button>
                         </div>
-                        <span class="help-text">Mặc định: Thư mục tạm của ứng dụng.</span>
+                        <span class="help-text">Dùng cho cả video lồng tiếng, video phụ đề và batch.</span>
                     </div>
 
                     <div class="form-group">
@@ -175,11 +175,18 @@
                 <div id="dropzoneState" class="workspace-state active">
                     <div class="upload-box" id="uploadBox">
                         <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-                        <h3>Kéo thả file video vào đây</h3>
-                        <p>Hỗ trợ MP4, MKV, AVI, MOV... dung lượng lên tới 500MB</p>
+                        <h3>Kéo thả video vào đây</h3>
+                        <p>Chọn 1 video để biên tập phụ đề, hoặc chọn nhiều video để chạy batch tuần tự.</p>
                         <div class="divider"><span>hoặc</span></div>
-                        <input type="file" id="videoFileInput" accept="video/*" style="display: none;">
-                        <button type="button" class="btn btn-primary" onclick="document.getElementById('videoFileInput').click()"><i class="fa-solid fa-file-video"></i> Chọn file từ máy Mac</button>
+                        <input type="file" id="videoFileInput" accept="video/*" multiple style="display: none;">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('videoFileInput').click()"><i class="fa-solid fa-file-video"></i> Chọn video từ máy Mac</button>
+                        <div id="batchQueuePanel" class="batch-queue-panel" style="display: none;">
+                            <div class="batch-queue-header">
+                                <span><i class="fa-solid fa-list-check"></i> Batch queue</span>
+                                <span id="batchQueueSummary">0 video</span>
+                            </div>
+                            <div id="batchQueueList" class="batch-queue-list"></div>
+                        </div>
                         
                         <div class="local-path-wrapper">
                             <div class="divider"><span>hoặc nhập đường dẫn trực tiếp trên Mac</span></div>
@@ -215,13 +222,21 @@
                             <div class="flow-line"></div>
                             <div class="flow-step" id="step_assemble">
                                 <div class="step-num"><i class="fa-solid fa-compact-disc"></i></div>
-                                <span>Lồng tiếng</span>
+                                <span>Xuất video</span>
                             </div>
                         </div>
 
                         <!-- Progress Bar -->
                         <div class="progress-bar-container">
                             <div class="progress-bar" id="processingProgressBar" style="width: 5%;"></div>
+                        </div>
+
+                        <div id="batchProcessingPanel" class="batch-queue-panel compact" style="display: none;">
+                            <div class="batch-queue-header">
+                                <span><i class="fa-solid fa-list-check"></i> Batch queue</span>
+                                <span id="batchProcessingSummary">0 video</span>
+                            </div>
+                            <div id="batchProcessingList" class="batch-queue-list"></div>
                         </div>
 
                         <!-- Terminal console log -->
@@ -244,7 +259,7 @@
                     <div class="editor-card">
                         <div class="editor-header">
                             <h3><i class="fa-solid fa-pen-to-square"></i> Biên tập Phụ đề & Bản dịch</h3>
-                            <p>Kiểm tra và sửa đổi bản dịch từ Gemini trước khi tiến hành lồng tiếng.</p>
+                            <p>Kiểm tra và sửa đổi bản dịch từ Gemini trước khi xuất video lồng tiếng hoặc video chỉ có phụ đề.</p>
                         </div>
 
                         <div class="editor-workspace">
@@ -277,7 +292,10 @@
 
                         <div class="editor-actions">
                             <button id="cancelDubBtn" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Quay lại</button>
-                            <button id="startDubBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-circle-play"></i> Lồng Tiếng & Tạo Video</button>
+                            <div class="editor-primary-actions">
+                                <button id="exportSubtitlesBtn" class="btn btn-secondary"><i class="fa-solid fa-closed-captioning"></i> Xuất video phụ đề</button>
+                                <button id="startDubBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-microphone-lines"></i> Lồng tiếng & xuất video</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -287,8 +305,8 @@
                     <div class="complete-card">
                         <div class="success-header">
                             <div class="success-icon"><i class="fa-solid fa-circle-check"></i></div>
-                            <h2>Lồng Tiếng Video Hoàn Tất!</h2>
-                            <p>Ứng dụng đã hoàn thành dịch thuật, lồng tiếng và lồng ghép phụ đề cực kỳ chính xác.</p>
+                            <h2 id="completeTitle">Xuất Video Hoàn Tất!</h2>
+                            <p id="completeDescription">Ứng dụng đã hoàn thành xử lý và lưu video vào thư mục đã chọn.</p>
                         </div>
 
                         <div class="final-preview">
@@ -304,7 +322,8 @@
 
                         <div class="complete-actions">
                             <button id="startOverBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>
-                            <a id="downloadVideoBtn" download class="btn btn-success btn-glow" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><i class="fa-solid fa-download"></i> Tải về máy Mac</a>
+                            <button id="copyPathBtn" type="button" class="btn btn-secondary"><i class="fa-solid fa-copy"></i> Sao chép đường dẫn</button>
+                            <button id="revealOutputBtn" type="button" class="btn btn-success btn-glow"><i class="fa-solid fa-folder-open"></i> Hiện trong Finder</button>
                         </div>
                     </div>
                 </div>

@@ -4,6 +4,7 @@ import time
 import uvicorn
 import webview
 import socket
+import subprocess
 
 def find_free_port():
     """Find a free port on localhost"""
@@ -34,6 +35,12 @@ class DesktopApi:
         if result and len(result) > 0:
             return result[0]
         return None
+
+    def reveal_in_finder(self, path):
+        if not path or not os.path.exists(path):
+            return {"ok": False, "error": "File không tồn tại."}
+        subprocess.run(["open", "-R", path], check=False)
+        return {"ok": True}
 
 if __name__ == '__main__':
     import threading
