@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Translate Pro - Lồng Tiếng & Phụ Đề AI</title>
+    <title>Video Translate Pro - Thuyết Minh & Phụ Đề AI</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,18 +46,18 @@
                             <input type="text" id="outputDir" placeholder="Đường dẫn thư mục, ví dụ: /Users/.../Desktop" value="{{ config.output_dir or '' }}">
                             <button type="button" id="selectOutputDirBtn" class="btn-toggle-eye" style="right: 10px;" title="Chọn thư mục"><i class="fa-solid fa-folder-open"></i></button>
                         </div>
-                        <span class="help-text">Dùng cho cả video lồng tiếng, video phụ đề và batch.</span>
+                        <span class="help-text">Dùng cho cả video thuyết minh, video phụ đề và batch.</span>
                     </div>
 
-                    <div class="form-group">
-                        <label for="ttsEngine">Động cơ lồng tiếng</label>
+                    <div class="form-group narration-setting">
+                        <label for="ttsEngine">Động cơ thuyết minh</label>
                         <select id="ttsEngine">
                             <option value="gtts" {% if config.tts_engine == 'gtts' %}selected{% endif %}>gTTS (Google Translate - Miễn Phí)</option>
                             <option value="google_cloud" {% if config.tts_engine == 'google_cloud' %}selected{% endif %}>Google Cloud TTS (Siêu Thực)</option>
                         </select>
                     </div>
 
-                    <div id="gcpCredentialsGroup" class="form-group" style="display: none;">
+                    <div id="gcpCredentialsGroup" class="form-group narration-setting" style="display: none;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                             <label for="gcpCredentials" style="margin-bottom: 0;">Google Cloud Credentials JSON</label>
                             <button type="button" id="toggleGcpCredentials" class="btn-toggle-eye" style="position: static; background: none; border: none; padding: 0; color: var(--text-secondary); cursor: pointer;" title="Hiện/Ẩn thông tin"><i class="fa-solid fa-eye"></i></button>
@@ -103,13 +103,22 @@
 
                 <!-- Section: Advanced -->
                 <div class="nav-section">
-                    <h2 class="section-title"><i class="fa-solid fa-sliders"></i> Tùy Chọn Lồng Tiếng</h2>
-                    <div class="form-group" id="voiceNameGroup" style="display: none;">
+                    <h2 class="section-title"><i class="fa-solid fa-sliders"></i> Tùy Chọn Xuất Video</h2>
+                    <div class="form-group">
+                        <label>Chế độ xuất</label>
+                        <div class="mode-tabs" role="tablist" aria-label="Chế độ xuất video">
+                            <button type="button" id="outputModeDub" class="mode-tab active" data-output-mode="dubbed"><i class="fa-solid fa-microphone-lines"></i> Thuyết minh</button>
+                            <button type="button" id="outputModeSubtitles" class="mode-tab" data-output-mode="subtitles_only"><i class="fa-solid fa-closed-captioning"></i> Chỉ phụ đề</button>
+                        </div>
+                        <span id="outputModeHelp" class="help-text">Tạo giọng thuyết minh và có thể kèm phụ đề.</span>
+                    </div>
+
+                    <div class="form-group narration-setting" id="voiceNameGroup" style="display: none;">
                         <label for="voiceName">Giọng đọc (Cloud TTS)</label>
                         <select id="voiceName" class="styled-select"></select>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group narration-setting">
                         <div class="slider-label">
                             <label>Tốc độ cơ bản giọng nói</label>
                             <span id="baseSpeedVal">1.0x</span>
@@ -117,7 +126,7 @@
                         <input type="range" id="baseSpeed" min="0.8" max="1.5" step="0.05" value="1.0">
                     </div>
 
-                    <div class="form-group checkbox-group">
+                    <div class="form-group checkbox-group narration-setting">
                         <label class="checkbox-container">
                             <input type="checkbox" id="matchDuration" checked>
                             <span class="checkmark"></span>
@@ -125,7 +134,7 @@
                         </label>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group narration-setting">
                         <div class="slider-label">
                             <label>Nhạc nền gốc</label>
                             <span id="originalVolVal">10%</span>
@@ -133,9 +142,9 @@
                         <input type="range" id="originalVol" min="0" max="1" step="0.05" value="0.10">
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group narration-setting">
                         <div class="slider-label">
-                            <label>Giọng lồng tiếng</label>
+                            <label>Giọng thuyết minh</label>
                             <span id="dubVolVal">100%</span>
                         </div>
                         <input type="range" id="dubVol" min="0" max="1" step="0.05" value="1.00">
@@ -161,7 +170,7 @@
             <!-- Header Status -->
             <header class="app-header">
                 <div class="header-title">
-                    <h2>Dịch thuật & Lồng tiếng Video</h2>
+                    <h2>Dịch thuật & Thuyết minh Video</h2>
                     <p>Đơn giản hóa quy trình sản xuất video đa ngôn ngữ với trí tuệ nhân tạo của Google.</p>
                 </div>
                 <div class="app-status">
@@ -176,7 +185,7 @@
                     <div class="upload-box" id="uploadBox">
                         <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
                         <h3>Kéo thả video vào đây</h3>
-                        <p>Chọn 1 video để biên tập phụ đề, hoặc chọn nhiều video để chạy batch tuần tự.</p>
+                        <p>Chọn 1 video để biên tập phụ đề, hoặc chọn nhiều video để duyệt từng video trong batch.</p>
                         <div class="divider"><span>hoặc</span></div>
                         <input type="file" id="videoFileInput" accept="video/*" multiple style="display: none;">
                         <button type="button" class="btn btn-primary" onclick="document.getElementById('videoFileInput').click()"><i class="fa-solid fa-file-video"></i> Chọn video từ máy Mac</button>
@@ -259,7 +268,8 @@
                     <div class="editor-card">
                         <div class="editor-header">
                             <h3><i class="fa-solid fa-pen-to-square"></i> Biên tập Phụ đề & Bản dịch</h3>
-                            <p>Kiểm tra và sửa đổi bản dịch từ Gemini trước khi xuất video lồng tiếng hoặc video chỉ có phụ đề.</p>
+                            <p>Kiểm tra và sửa đổi bản dịch từ Gemini trước khi xuất video thuyết minh hoặc video chỉ có phụ đề.</p>
+                            <div id="batchReviewStatus" class="batch-review-status" style="display: none;"></div>
                         </div>
 
                         <div class="editor-workspace">
@@ -293,8 +303,7 @@
                         <div class="editor-actions">
                             <button id="cancelDubBtn" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Quay lại</button>
                             <div class="editor-primary-actions">
-                                <button id="exportSubtitlesBtn" class="btn btn-secondary"><i class="fa-solid fa-closed-captioning"></i> Xuất video phụ đề</button>
-                                <button id="startDubBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-microphone-lines"></i> Lồng tiếng & xuất video</button>
+                                <button id="startDubBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-compact-disc"></i> Xuất video</button>
                             </div>
                         </div>
                     </div>
@@ -330,6 +339,7 @@
 
                         <div class="complete-actions">
                             <button id="startOverBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>
+                            <button id="continueBatchBtn" type="button" class="btn btn-secondary" style="display: none;"><i class="fa-solid fa-forward-step"></i> Video kế tiếp</button>
                             <button id="copyPathBtn" type="button" class="btn btn-secondary"><i class="fa-solid fa-copy"></i> Sao chép đường dẫn</button>
                             <button id="revealOutputBtn" type="button" class="btn btn-success btn-glow"><i class="fa-solid fa-folder-open"></i> Hiện trong Finder</button>
                         </div>

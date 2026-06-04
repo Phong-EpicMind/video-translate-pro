@@ -4,6 +4,8 @@ let currentSubtitles = [];
 let currentSourceFilename = "";
 let lastOutputPath = "";
 let lastOutputResults = [];
+let selectedOutputMode = "dubbed";
+let batchSession = null;
 let hasSavedGeminiKey = false;
 let hasSavedGoogleCloudCredentials = false;
 
@@ -97,11 +99,13 @@ const subtitleTableBody = document.getElementById("subtitleTableBody");
 const cancelDubBtn = document.getElementById("cancelDubBtn");
 const startDubBtn = document.getElementById("startDubBtn");
 const exportSubtitlesBtn = document.getElementById("exportSubtitlesBtn");
+const batchReviewStatus = document.getElementById("batchReviewStatus");
 
 const finalVideoPlayer = document.getElementById("finalVideoPlayer");
 const finalVideoPath = document.getElementById("finalVideoPath");
 const revealOutputBtn = document.getElementById("revealOutputBtn");
 const copyPathBtn = document.getElementById("copyPathBtn");
+const continueBatchBtn = document.getElementById("continueBatchBtn");
 const startOverBtn = document.getElementById("startOverBtn");
 const headerStartOverBtn = document.getElementById("headerStartOverBtn");
 const completeTitle = document.getElementById("completeTitle");
@@ -137,9 +141,14 @@ const dubVol = document.getElementById("dubVol");
 const dubVolVal = document.getElementById("dubVolVal");
 const burnSubtitles = document.getElementById("burnSubtitles");
 const saveConfigBtn = document.getElementById("saveConfigBtn");
+const outputModeDub = document.getElementById("outputModeDub");
+const outputModeSubtitles = document.getElementById("outputModeSubtitles");
+const outputModeHelp = document.getElementById("outputModeHelp");
+const narrationSettings = document.querySelectorAll(".narration-setting");
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
+    selectedOutputMode = localStorage.getItem("outputMode") || "dubbed";
     loadConfig();
     setupEventListeners();
 });
@@ -215,6 +224,11 @@ function setupEventListeners() {
     // Save config
     saveConfigBtn.addEventListener("click", saveConfig);
 
+    [outputModeDub, outputModeSubtitles].forEach(button => {
+        if (!button) return;
+        button.addEventListener("click", () => setOutputMode(button.dataset.outputMode));
+    });
+
     // Dropzone drag-and-drop
     uploadBox.addEventListener("dragover", (e) => {
         e.preventDefault();
@@ -259,7 +273,7 @@ function setupEventListeners() {
         editorVideoPlayer.src = "";
     });
 
-    startDubBtn.addEventListener("click", startDubbingPipeline);
+    startDubBtn.addEventListener("click", () => startExportPipeline());
     if (exportSubtitlesBtn) {
         exportSubtitlesBtn.addEventListener("click", startSubtitleOnlyPipeline);
     }
@@ -270,6 +284,9 @@ function setupEventListeners() {
 
     if (copyPathBtn) {
         copyPathBtn.addEventListener("click", copyLastOutputPath);
+    }
+    if (continueBatchBtn) {
+        continueBatchBtn.addEventListener("click", processNextBatchVideo);
     }
     if (batchResultsList) {
         batchResultsList.addEventListener("click", (event) => {
@@ -290,12 +307,15 @@ function setupEventListeners() {
         currentSourceFilename = "";
         lastOutputPath = "";
         lastOutputResults = [];
+        batchSession = null;
         localVideoPath.value = "";
         videoFileInput.value = "";
         subtitleTableBody.innerHTML = "";
         consoleBody.innerHTML = '<div class="console-line system">[SYSTEM] Hệ thống đã sẵn sàng...</div>';
         renderBatchQueue([]);
         renderBatchResults([]);
+        updateBatchReviewStatus();
+        if (continueBatchBtn) continueBatchBtn.style.display = "none";
     };
 
     startOverBtn.addEventListener("click", resetAppFlow);
@@ -333,6 +353,29 @@ function showToast(message) {
     }, 3000);
 }
 
+function setOutputMode(mode) {
+    selectedOutputMode = mode === "subtitles_only" ? "subtitles_only" : "dubbed";
+    localStorage.setItem("outputMode", selectedOutputMode);
+    if (outputModeDub) outputModeDub.classList.toggle("active", selectedOutputMode === "dubbed");
+    if (outputModeSubtitles) outputModeSubtitles.classList.toggle("active", selectedOutputMode === "subtitles_only");
+
+    narrationSettings.forEach(el => {
+        el.style.display = selectedOutputMode === "dubbed" ? "" : "none";
+    });
+
+    if (outputModeHelp) {
+        outputModeHelp.textContent = selectedOutputMode === "dubbed"
+            ? "Tạo giọng thuyết minh và có thể kèm phụ đề."
+            : "Không tạo giọng thuyết minh; chỉ xuất video với phụ đề dịch.";
+    }
+    if (startDubBtn) {
+        startDubBtn.innerHTML = selectedOutputMode === "dubbed"
+            ? '<i class="fa-solid fa-microphone-lines"></i> Xuất video thuyết minh'
+            : '<i class="fa-solid fa-closed-captioning"></i> Xuất video phụ đề';
+    }
+    toggleTtsEngineGroups();
+}
+
 function renderBatchQueue(items) {
     const targets = [
         { panel: batchQueuePanel, list: batchQueueList, summary: batchQueueSummary },
@@ -355,6 +398,7 @@ function renderBatchQueue(items) {
             queued: "fa-clock",
             upload: "fa-cloud-arrow-up",
             translate: "fa-language",
+            review: "fa-pen-to-square",
             export: "fa-compact-disc",
             done: "fa-circle-check",
             error: "fa-circle-exclamation",
@@ -404,7 +448,7 @@ async function loadConfig() {
             matchDuration.checked = config.match_duration;
         }
         
-        toggleTtsEngineGroups();
+        setOutputMode(selectedOutputMode);
     } catch (e) {
         console.error("Lỗi tải cấu hình:", e);
     }
@@ -489,6 +533,11 @@ async function saveConfigSilently() {
 
 // Show/hide Google Cloud TTS input groups
 function toggleTtsEngineGroups() {
+    if (selectedOutputMode !== "dubbed") {
+        gcpCredentialsGroup.style.display = "none";
+        voiceNameGroup.style.display = "none";
+        return;
+    }
     if (ttsEngine.value === "google_cloud") {
         gcpCredentialsGroup.style.display = "block";
         voiceNameGroup.style.display = "block";
@@ -576,6 +625,34 @@ async function handleFileUpload(file) {
     }
 }
 
+function getCurrentBatchItem() {
+    if (!batchSession || !batchSession.active) return null;
+    return batchSession.items[batchSession.currentIndex] || null;
+}
+
+function updateCurrentBatchItem(status, label, extra = {}) {
+    const item = getCurrentBatchItem();
+    if (!item) return;
+    Object.assign(item, extra, { status, label });
+    renderBatchQueue(batchSession.items);
+}
+
+function hasNextBatchVideo() {
+    return Boolean(batchSession && batchSession.active && batchSession.currentIndex < batchSession.items.length - 1);
+}
+
+function updateBatchReviewStatus() {
+    if (!batchReviewStatus) return;
+    const item = getCurrentBatchItem();
+    if (!item || item.status !== "review") {
+        batchReviewStatus.style.display = "none";
+        batchReviewStatus.textContent = "";
+        return;
+    }
+    batchReviewStatus.style.display = "inline-flex";
+    batchReviewStatus.innerHTML = `<i class="fa-solid fa-list-check"></i> Batch ${batchSession.currentIndex + 1}/${batchSession.items.length}: ${escapeHtml(item.name)} đang chờ duyệt lời dịch`;
+}
+
 // Reset Pipeline UI Flowchart states
 function resetPipelineFlowchart() {
     const steps = ["step_init", "step_extract", "step_transcribe", "step_assemble"];
@@ -651,6 +728,7 @@ function startTranslationPipeline(videoPath) {
                 processingProgressBar.style.width = "90%";
                 
                 currentSubtitles = data.subtitles;
+                updateCurrentBatchItem("review", "Duyệt lời dịch", { subtitles: data.subtitles });
                 
                 // Finish translation, proceed to Subtitle Editor
                 setTimeout(() => {
@@ -712,93 +790,62 @@ async function startBatchPipeline(files) {
     }
 
     saveConfigSilently();
-    const items = files.map(file => ({ name: file.name, status: "queued", label: "Đang chờ" }));
-    renderBatchQueue(items);
+    batchSession = {
+        active: true,
+        currentIndex: 0,
+        items: files.map(file => ({ file, name: file.name, status: "queued", label: "Đang chờ" })),
+        outputs: []
+    };
+    lastOutputResults = [];
+    renderBatchQueue(batchSession.items);
+    await processCurrentBatchVideo();
+}
+
+async function processCurrentBatchVideo() {
+    const item = getCurrentBatchItem();
+    if (!item) {
+        showToast("Không còn video nào trong batch.");
+        return;
+    }
 
     switchState(processingState);
     resetPipelineFlowchart();
     consoleBody.innerHTML = "";
-    pipelineTitle.innerHTML = '<i class="fa-solid fa-list-check"></i> Đang xử lý batch video...';
+    pipelineTitle.innerHTML = `<i class="fa-solid fa-list-check"></i> Batch ${batchSession.currentIndex + 1}/${batchSession.items.length}: Đang chuẩn bị video...`;
     processingProgressBar.style.width = "3%";
     document.getElementById("step_init").className = "flow-step active";
-    logToConsole(`Bắt đầu batch ${files.length} video. App sẽ xử lý tuần tự để ổn định tài nguyên.`, "info");
+    logToConsole(`Batch ${batchSession.currentIndex + 1}/${batchSession.items.length}: ${item.name}`, "info");
 
-    let lastResult = null;
-    const outputs = [];
-    let successCount = 0;
-
-    for (let index = 0; index < files.length; index += 1) {
-        const file = files[index];
-        const item = items[index];
-        try {
-            item.status = "upload";
-            item.label = "Đang upload";
-            renderBatchQueue(items);
-            logToConsole(`[${index + 1}/${files.length}] Upload ${file.name}`, "info");
-            const upload = await uploadVideoFile(file);
-
-            item.status = "translate";
-            item.label = "Đang dịch";
-            renderBatchQueue(items);
-            document.getElementById("step_extract").className = "flow-step active";
-            const subtitles = await translateVideoToSubtitles(upload.video_path);
-            if (!subtitles.length) throw new Error("Không có phụ đề sau khi dịch.");
-
-            item.status = "export";
-            item.label = "Đang xuất";
-            renderBatchQueue(items);
-            document.getElementById("step_assemble").className = "flow-step active";
-            lastResult = await streamVideoExport({
-                video_path: upload.video_path,
-                source_filename: upload.filename || file.name,
-                subtitles,
-                output_mode: "dubbed",
-                original_vol: parseFloat(originalVol.value),
-                dub_vol: parseFloat(dubVol.value),
-                burn_subtitles: burnSubtitles.checked,
-                tts_engine: ttsEngine.value,
-                voice_name: voiceName.value,
-                base_speed: parseFloat(baseSpeed.value),
-                match_duration: matchDuration.checked
-            });
-            outputs.push({
-                name: upload.filename || file.name,
-                preview_url: lastResult.preview_url,
-                absolute_path: lastResult.absolute_path
-            });
-
-            successCount += 1;
-            item.status = "done";
-            item.label = "Hoàn tất";
-            renderBatchQueue(items);
-            processingProgressBar.style.width = `${Math.round(((index + 1) / files.length) * 100)}%`;
-        } catch (e) {
-            item.status = "error";
-            item.label = "Lỗi";
-            renderBatchQueue(items);
-            logToConsole(`[${index + 1}/${files.length}] ${file.name}: ${e.message}`, "error");
-        }
+    try {
+        updateCurrentBatchItem("upload", "Đang upload");
+        logToConsole(`Upload ${item.name}`, "info");
+        const upload = await uploadVideoFile(item.file);
+        updateCurrentBatchItem("translate", "Đang dịch", { upload });
+        currentVideoPath = upload.video_path;
+        currentSourceFilename = upload.filename || item.name;
+        pipelineTitle.innerHTML = `<i class="fa-solid fa-language"></i> Batch ${batchSession.currentIndex + 1}/${batchSession.items.length}: Đang dịch phụ đề...`;
+        document.getElementById("step_extract").className = "flow-step active";
+        startTranslationPipeline(upload.video_path);
+    } catch (e) {
+        updateCurrentBatchItem("error", "Lỗi");
+        logToConsole(`${item.name}: ${e.message}`, "error");
+        showToast("Lỗi xử lý video trong batch.");
     }
+}
 
-    document.getElementById("step_init").className = "flow-step success";
-    document.getElementById("step_extract").className = "flow-step success";
-    document.getElementById("step_transcribe").className = "flow-step success";
-    document.getElementById("step_assemble").className = successCount > 0 ? "flow-step success" : "flow-step error";
-
-    if (lastResult) {
-        revealCompletePanel(lastResult.preview_url, lastResult.absolute_path, {
-            title: "Batch Video Hoàn Tất",
-            description: `Đã xử lý xong ${successCount}/${files.length} video. Chọn từng file trong danh sách để xem preview hoặc mở trong Finder.`,
-            outputs
-        });
-    } else {
-        showToast("Batch chưa xuất được video nào.");
+async function processNextBatchVideo() {
+    if (!hasNextBatchVideo()) {
+        showToast("Batch đã xử lý hết video.");
+        return;
     }
+    batchSession.currentIndex += 1;
+    await processCurrentBatchVideo();
 }
 
 // Render Subtitle Editor Grid
 function initSubtitleEditor(subtitles) {
     switchState(subtitleEditorState);
+    updateBatchReviewStatus();
     subtitleTableBody.innerHTML = "";
     
     // Set video file preview path (if it's a temp upload file, load it locally)
@@ -1004,7 +1051,7 @@ async function startSubtitleOnlyPipeline() {
     await startExportPipeline("subtitles_only");
 }
 
-async function startExportPipeline(outputMode) {
+async function startExportPipeline(outputMode = selectedOutputMode) {
     const subsPayload = collectEditedSubtitles();
     if (!subsPayload) return;
 
@@ -1015,7 +1062,7 @@ async function startExportPipeline(outputMode) {
     const isSubtitleOnly = outputMode === "subtitles_only";
     pipelineTitle.innerHTML = isSubtitleOnly
         ? '<i class="fa-solid fa-closed-captioning"></i> Đang xuất video chỉ có phụ đề...'
-        : '<i class="fa-solid fa-spinner fa-spin"></i> Đang lồng tiếng & ghép video...';
+        : '<i class="fa-solid fa-spinner fa-spin"></i> Đang thuyết minh & ghép video...';
 
     // Mark previous steps as success
     document.getElementById("step_init").className = "flow-step success";
@@ -1029,7 +1076,8 @@ async function startExportPipeline(outputMode) {
     }
 
     document.getElementById("step_assemble").className = "flow-step active";
-    logToConsole(isSubtitleOnly ? "Khởi chạy luồng xuất video phụ đề..." : "Khởi chạy luồng lồng tiếng và mix âm thanh...", "info");
+    updateCurrentBatchItem("export", "Đang xuất");
+    logToConsole(isSubtitleOnly ? "Khởi chạy luồng xuất video phụ đề..." : "Khởi chạy luồng thuyết minh và mix âm thanh...", "info");
     processingProgressBar.style.width = "40%";
 
     const payload = {
@@ -1048,12 +1096,34 @@ async function startExportPipeline(outputMode) {
 
     try {
         const data = await streamVideoExport(payload);
+        const outputRecord = {
+            name: currentSourceFilename || data.absolute_path.split("/").pop(),
+            preview_url: data.preview_url,
+            absolute_path: data.absolute_path,
+            output_mode: outputMode
+        };
+        const item = getCurrentBatchItem();
+        if (item) {
+            item.result = outputRecord;
+            updateCurrentBatchItem("done", "Hoàn tất", { result: outputRecord });
+            batchSession.outputs.push(outputRecord);
+        }
         setTimeout(() => {
+            const batchTitle = item
+                ? `Video ${batchSession.currentIndex + 1}/${batchSession.items.length} Hoàn Tất`
+                : null;
+            const nextText = item && hasNextBatchVideo()
+                ? "Bấm Video kế tiếp để dịch video tiếp theo; các video đã xuất có thể xem lại trong danh sách."
+                : "Batch đã hoàn tất. Chọn từng file trong danh sách để xem preview hoặc mở trong Finder.";
             revealCompletePanel(data.preview_url, data.absolute_path, {
-                title: isSubtitleOnly ? "Video Phụ Đề Hoàn Tất" : "Video Lồng Tiếng Hoàn Tất",
-                description: isSubtitleOnly
-                    ? "Ứng dụng đã xuất video không lồng tiếng, chỉ dùng phụ đề dịch."
-                    : "Ứng dụng đã hoàn thành dịch thuật, lồng tiếng và xuất video."
+                title: batchTitle || (isSubtitleOnly ? "Video Phụ Đề Hoàn Tất" : "Video Thuyết Minh Hoàn Tất"),
+                description: item
+                    ? nextText
+                    : (isSubtitleOnly
+                        ? "Ứng dụng đã xuất video không thuyết minh, chỉ dùng phụ đề dịch."
+                        : "Ứng dụng đã hoàn thành dịch thuật, thuyết minh và xuất video."),
+                outputs: item ? batchSession.outputs : [],
+                hasNextBatch: item ? hasNextBatchVideo() : false
             });
         }, 1000);
     } catch (e) {
@@ -1076,12 +1146,15 @@ function revealCompletePanel(previewUrl, absolutePath, options = {}) {
     if (completeDescription) {
         completeDescription.textContent = options.description || "Ứng dụng đã hoàn thành xử lý và lưu video vào thư mục đã chọn.";
     }
+    if (continueBatchBtn) {
+        continueBatchBtn.style.display = options.hasNextBatch ? "inline-flex" : "none";
+    }
     renderBatchResults(lastOutputResults);
 }
 
 function renderBatchResults(outputs) {
     if (!batchResultsPanel || !batchResultsList) return;
-    if (!outputs || outputs.length <= 1) {
+    if (!outputs || outputs.length === 0) {
         batchResultsPanel.style.display = "none";
         batchResultsList.innerHTML = "";
         return;

@@ -568,7 +568,7 @@ async def dub_progress(req: DubbingRequest):
                 return
 
             # 1. Voice Synthesis (TTS)
-            yield f"data: {json.dumps({'step': 'tts', 'status': 'processing', 'message': f'Bắt đầu lồng tiếng cho {len(subtitles)} đoạn phụ đề sử dụng động cơ {req.tts_engine.upper()}...'})}\n\n"
+            yield f"data: {json.dumps({'step': 'tts', 'status': 'processing', 'message': f'Bắt đầu tạo thuyết minh cho {len(subtitles)} đoạn phụ đề sử dụng động cơ {req.tts_engine.upper()}...'})}\n\n"
             
             sub_dicts = []
             voice_config = {}
@@ -592,7 +592,7 @@ async def dub_progress(req: DubbingRequest):
                 
                 target_duration = sub.end_ms - sub.start_ms
                 
-                msg = f"Đang lồng tiếng dòng {sub.index}/{len(subtitles)}: '{sub.translated_text[:20]}...'"
+                msg = f"Đang tạo thuyết minh dòng {sub.index}/{len(subtitles)}: '{sub.translated_text[:20]}...'"
                 yield f"data: {json.dumps({'step': 'tts', 'status': 'processing', 'message': msg})}\n\n"
                 
                 def generate_single_tts(text=sub.translated_text, start=sub.start_ms, end=sub.end_ms):
@@ -643,11 +643,11 @@ async def dub_progress(req: DubbingRequest):
                 
             await asyncio.to_thread(run_assembly)
             
-            yield f"data: {json.dumps({'step': 'tts', 'status': 'done', 'message': 'Lồng tiếng và đồng bộ hóa âm thanh thành công!'})}\n\n"
+            yield f"data: {json.dumps({'step': 'tts', 'status': 'done', 'message': 'Thuyết minh và đồng bộ hóa âm thanh thành công!'})}\n\n"
             await asyncio.sleep(0.5)
             
             # 3. Merge Audio and Video
-            yield f"data: {json.dumps({'step': 'merge', 'status': 'processing', 'message': 'Đang mix âm thanh lồng tiếng với video gốc...'})}\n\n"
+            yield f"data: {json.dumps({'step': 'merge', 'status': 'processing', 'message': 'Đang mix âm thanh thuyết minh với video gốc...'})}\n\n"
             
             import queue
             import threading
@@ -691,7 +691,7 @@ async def dub_progress(req: DubbingRequest):
                     
             if not merge_container["success"]:
                 err_msg = merge_container["error"] or "Lỗi mix video chưa xác định."
-                yield f"data: {json.dumps({'step': 'error', 'message': f'Thất bại khi ghép âm thanh lồng tiếng vào video: {err_msg}'})}\n\n"
+                yield f"data: {json.dumps({'step': 'error', 'message': f'Thất bại khi ghép âm thanh thuyết minh vào video: {err_msg}'})}\n\n"
                 return
                 
             # Clean up chunks
@@ -699,7 +699,7 @@ async def dub_progress(req: DubbingRequest):
             
             # Send relative preview URL (since /temp is mounted)
             preview_url = preview_url_for_output(output_video_path)
-            yield f"data: {json.dumps({'step': 'merge', 'status': 'done', 'message': 'Hoàn thành lồng tiếng & ghép phụ đề!', 'preview_url': preview_url, 'absolute_path': output_video_path, 'output_mode': output_mode})}\n\n"
+            yield f"data: {json.dumps({'step': 'merge', 'status': 'done', 'message': 'Hoàn thành thuyết minh & ghép phụ đề!', 'preview_url': preview_url, 'absolute_path': output_video_path, 'output_mode': output_mode})}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'step': 'error', 'message': f'Lỗi hệ thống: {e}'})}\n\n"
