@@ -51,6 +51,10 @@ SECRET_CONFIG_KEYS = {
     "gemini_key": "gemini_api_key",
     "google_cloud_credentials": "google_cloud_service_account_json",
 }
+SECRET_PRESENCE_CONFIG_KEY = "secret_presence"
+_SECRET_CACHE = {}
+_SECRET_READ_ATTEMPTED = set()
+_SECRET_PRESENCE_CHECKED = set()
 
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -125,9 +129,14 @@ def keychain_available() -> bool:
     return Security is not None
 
 def keychain_get(account: str) -> str:
+    if account in _SECRET_CACHE:
+        return _SECRET_CACHE[account]
+    if account in _SECRET_READ_ATTEMPTED:
+        return ""
     if not keychain_available():
         return ""
 
+    _SECRET_READ_ATTEMPTED.add(account)
     query = _keychain_query(account)
     query[Security.kSecReturnData] = True
     query[Security.kSecMatchLimit] = Security.kSecMatchLimitOne
@@ -136,7 +145,23 @@ def keychain_get(account: str) -> str:
         return ""
     if status != Security.errSecSuccess:
         raise RuntimeError(f"Keychain read failed with status {status}.")
-    return bytes(data).decode("utf-8") if data is not None else ""
+    value = bytes(data).decode("utf-8") if data is not None else ""
+    if value:
+        _SECRET_CACHE[account] = value
+    return value
+
+def keychain_has(account: str) -> bool:
+    """Check whether a Keychain item exists without requesting the secret value."""
+    if account in _SECRET_CACHE:
+        return True
+    if not keychain_available():
+        return False
+
+    query = _keychain_query(account)
+    query[Security.kSecReturnAttributes] = True
+    query[Security.kSecMatchLimit] = Security.kSecMatchLimitOne
+    status, _ = Security.SecItemCopyMatching(query, None)
+    return status == Security.errSecSuccess
 
 def keychain_set(account: str, value: str) -> None:
     if not keychain_available():
@@ -149,12 +174,23 @@ def keychain_set(account: str, value: str) -> None:
         status = Security.SecItemUpdate(query, {Security.kSecValueData: encoded_value})
     if status != Security.errSecSuccess:
         raise RuntimeError(f"Keychain write failed with status {status}.")
+    _SECRET_CACHE[account] = value
+    _SECRET_READ_ATTEMPTED.discard(account)
 
 def get_secret(config_key: str) -> str:
     return keychain_get(SECRET_CONFIG_KEYS[config_key])
 
 def set_secret(config_key: str, value: str) -> None:
     keychain_set(SECRET_CONFIG_KEYS[config_key], value)
+
+def mark_secret_presence(config_data: dict, config_key: str, present: bool) -> None:
+    presence = config_data.setdefault(SECRET_PRESENCE_CONFIG_KEY, {})
+    presence[config_key] = bool(present)
+
+def secret_present(config_data: dict, config_key: str) -> bool:
+    account = SECRET_CONFIG_KEYS[config_key]
+    presence = config_data.get(SECRET_PRESENCE_CONFIG_KEY, {})
+    return bool(presence.get(config_key)) or bool(_SECRET_CACHE.get(account))
 
 def redact_config_secrets(config_data: dict) -> dict:
     return {key: value for key, value in config_data.items() if key not in SECRET_CONFIG_KEYS}
@@ -165,6 +201,7 @@ def migrate_config_secrets_to_keychain(config_data: dict) -> dict:
         value = config_data.get(config_key)
         if value:
             set_secret(config_key, value)
+            mark_secret_presence(config_data, config_key, True)
             migrated = True
 
     if migrated:
@@ -172,12 +209,31 @@ def migrate_config_secrets_to_keychain(config_data: dict) -> dict:
         save_config(config_data)
     return config_data
 
+def ensure_secret_presence_metadata(config_data: dict) -> dict:
+    """Populate non-sensitive presence flags without reading secret values."""
+    changed = False
+    for config_key, account in SECRET_CONFIG_KEYS.items():
+        if secret_present(config_data, config_key) or config_key in _SECRET_PRESENCE_CHECKED:
+            continue
+        _SECRET_PRESENCE_CHECKED.add(config_key)
+        try:
+            if keychain_has(account):
+                mark_secret_presence(config_data, config_key, True)
+                changed = True
+        except Exception:
+            # Presence is only a UI hint. Never block app startup on Keychain metadata checks.
+            pass
+
+    if changed:
+        save_config(redact_config_secrets(config_data))
+    return config_data
+
 def public_config(config_data):
     """Return UI-safe settings without exposing stored credentials."""
     config_data = migrate_config_secrets_to_keychain(config_data)
     return {
-        "has_gemini_key": bool(get_secret("gemini_key")),
-        "has_google_cloud_credentials": bool(get_secret("google_cloud_credentials")),
+        "has_gemini_key": secret_present(config_data, "gemini_key"),
+        "has_google_cloud_credentials": secret_present(config_data, "google_cloud_credentials"),
         "src_lang": config_data.get("src_lang", "auto"),
         "target_lang": config_data.get("target_lang", "vi"),
         "tts_engine": config_data.get("tts_engine", "gtts"),
@@ -280,10 +336,11 @@ async def update_config(data: ConfigUpdate):
         if key in {"gemini_key", "google_cloud_credentials"}:
             if value:
                 set_secret(key, value)
+                mark_secret_presence(config, key, True)
             continue
         config[key] = value
 
-    if not get_secret("gemini_key"):
+    if not secret_present(config, "gemini_key"):
         raise HTTPException(status_code=400, detail="Gemini API Key is required.")
 
     config = redact_config_secrets(config)
@@ -318,7 +375,11 @@ async def translate_progress(video_path: str, src_lang: str, target_lang: str):
             return
             
         config = migrate_config_secrets_to_keychain(load_config())
-        gemini_key = get_secret("gemini_key")
+        try:
+            gemini_key = get_secret("gemini_key")
+        except RuntimeError as e:
+            yield f"data: {json.dumps({'step': 'error', 'message': f'Không thể đọc Gemini API Key từ Keychain: {e}'})}\n\n"
+            return
             
         if not gemini_key:
             yield f"data: {json.dumps({'step': 'error', 'message': 'Chưa nhập Gemini API Key.'})}\n\n"
@@ -507,8 +568,13 @@ async def dub_progress(req: DubbingRequest):
             sub_dicts = []
             voice_config = {}
             if req.tts_engine == "google_cloud":
+                try:
+                    google_cloud_credentials = get_secret("google_cloud_credentials")
+                except RuntimeError as e:
+                    yield f"data: {json.dumps({'step': 'error', 'message': f'Không thể đọc Google Cloud JSON từ Keychain: {e}'})}\n\n"
+                    return
                 voice_config = {
-                    "credentials_json": get_secret("google_cloud_credentials"),
+                    "credentials_json": google_cloud_credentials,
                     "voice_name": req.voice_name
                 }
                 

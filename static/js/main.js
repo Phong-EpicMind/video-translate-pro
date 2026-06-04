@@ -3,6 +3,7 @@ let currentVideoPath = "";
 let currentSubtitles = [];
 let currentSourceFilename = "";
 let lastOutputPath = "";
+let lastOutputResults = [];
 let hasSavedGeminiKey = false;
 let hasSavedGoogleCloudCredentials = false;
 
@@ -105,6 +106,8 @@ const startOverBtn = document.getElementById("startOverBtn");
 const headerStartOverBtn = document.getElementById("headerStartOverBtn");
 const completeTitle = document.getElementById("completeTitle");
 const completeDescription = document.getElementById("completeDescription");
+const batchResultsPanel = document.getElementById("batchResultsPanel");
+const batchResultsList = document.getElementById("batchResultsList");
 const batchQueuePanel = document.getElementById("batchQueuePanel");
 const batchQueueList = document.getElementById("batchQueueList");
 const batchQueueSummary = document.getElementById("batchQueueSummary");
@@ -268,6 +271,13 @@ function setupEventListeners() {
     if (copyPathBtn) {
         copyPathBtn.addEventListener("click", copyLastOutputPath);
     }
+    if (batchResultsList) {
+        batchResultsList.addEventListener("click", (event) => {
+            const button = event.target.closest("[data-output-index]");
+            if (!button) return;
+            selectBatchOutput(parseInt(button.dataset.outputIndex, 10));
+        });
+    }
 
     const resetAppFlow = () => {
         switchState(dropzoneState);
@@ -279,11 +289,13 @@ function setupEventListeners() {
         currentSubtitles = [];
         currentSourceFilename = "";
         lastOutputPath = "";
+        lastOutputResults = [];
         localVideoPath.value = "";
         videoFileInput.value = "";
         subtitleTableBody.innerHTML = "";
         consoleBody.innerHTML = '<div class="console-line system">[SYSTEM] Hệ thống đã sẵn sàng...</div>';
         renderBatchQueue([]);
+        renderBatchResults([]);
     };
 
     startOverBtn.addEventListener("click", resetAppFlow);
@@ -712,6 +724,7 @@ async function startBatchPipeline(files) {
     logToConsole(`Bắt đầu batch ${files.length} video. App sẽ xử lý tuần tự để ổn định tài nguyên.`, "info");
 
     let lastResult = null;
+    const outputs = [];
     let successCount = 0;
 
     for (let index = 0; index < files.length; index += 1) {
@@ -748,6 +761,11 @@ async function startBatchPipeline(files) {
                 base_speed: parseFloat(baseSpeed.value),
                 match_duration: matchDuration.checked
             });
+            outputs.push({
+                name: upload.filename || file.name,
+                preview_url: lastResult.preview_url,
+                absolute_path: lastResult.absolute_path
+            });
 
             successCount += 1;
             item.status = "done";
@@ -770,7 +788,8 @@ async function startBatchPipeline(files) {
     if (lastResult) {
         revealCompletePanel(lastResult.preview_url, lastResult.absolute_path, {
             title: "Batch Video Hoàn Tất",
-            description: `Đã xử lý xong ${successCount}/${files.length} video. File preview bên dưới là video hoàn tất gần nhất.`
+            description: `Đã xử lý xong ${successCount}/${files.length} video. Chọn từng file trong danh sách để xem preview hoặc mở trong Finder.`,
+            outputs
         });
     } else {
         showToast("Batch chưa xuất được video nào.");
@@ -1050,12 +1069,44 @@ function revealCompletePanel(previewUrl, absolutePath, options = {}) {
     finalVideoPlayer.src = previewUrl;
     finalVideoPath.textContent = absolutePath;
     lastOutputPath = absolutePath;
+    lastOutputResults = Array.isArray(options.outputs) ? options.outputs : [];
     if (completeTitle) {
         completeTitle.textContent = options.title || "Xuất Video Hoàn Tất";
     }
     if (completeDescription) {
         completeDescription.textContent = options.description || "Ứng dụng đã hoàn thành xử lý và lưu video vào thư mục đã chọn.";
     }
+    renderBatchResults(lastOutputResults);
+}
+
+function renderBatchResults(outputs) {
+    if (!batchResultsPanel || !batchResultsList) return;
+    if (!outputs || outputs.length <= 1) {
+        batchResultsPanel.style.display = "none";
+        batchResultsList.innerHTML = "";
+        return;
+    }
+
+    batchResultsPanel.style.display = "block";
+    batchResultsList.innerHTML = outputs.map((output, index) => {
+        const isActive = output.absolute_path === lastOutputPath;
+        return `
+            <button type="button" class="batch-result-item ${isActive ? "active" : ""}" data-output-index="${index}">
+                <i class="fa-solid fa-film"></i>
+                <span class="batch-result-name">${escapeHtml(output.name || `Video ${index + 1}`)}</span>
+                <span class="batch-result-action">Xem</span>
+            </button>
+        `;
+    }).join("");
+}
+
+function selectBatchOutput(index) {
+    const output = lastOutputResults[index];
+    if (!output) return;
+    finalVideoPlayer.src = output.preview_url;
+    finalVideoPath.textContent = output.absolute_path;
+    lastOutputPath = output.absolute_path;
+    renderBatchResults(lastOutputResults);
 }
 
 async function revealLastOutputInFinder() {
