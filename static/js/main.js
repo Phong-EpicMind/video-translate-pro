@@ -106,6 +106,7 @@ const finalVideoPath = document.getElementById("finalVideoPath");
 const revealOutputBtn = document.getElementById("revealOutputBtn");
 const copyPathBtn = document.getElementById("copyPathBtn");
 const continueBatchBtn = document.getElementById("continueBatchBtn");
+const continueBatchTopBtn = document.getElementById("continueBatchTopBtn");
 const startOverBtn = document.getElementById("startOverBtn");
 const headerStartOverBtn = document.getElementById("headerStartOverBtn");
 const completeTitle = document.getElementById("completeTitle");
@@ -288,6 +289,9 @@ function setupEventListeners() {
     if (continueBatchBtn) {
         continueBatchBtn.addEventListener("click", processNextBatchVideo);
     }
+    if (continueBatchTopBtn) {
+        continueBatchTopBtn.addEventListener("click", processNextBatchVideo);
+    }
     if (batchResultsList) {
         batchResultsList.addEventListener("click", (event) => {
             const button = event.target.closest("[data-output-index]");
@@ -316,6 +320,7 @@ function setupEventListeners() {
         renderBatchResults([]);
         updateBatchReviewStatus();
         if (continueBatchBtn) continueBatchBtn.style.display = "none";
+        if (continueBatchTopBtn) continueBatchTopBtn.style.display = "none";
     };
 
     startOverBtn.addEventListener("click", resetAppFlow);
@@ -1148,6 +1153,9 @@ function revealCompletePanel(previewUrl, absolutePath, options = {}) {
     }
     if (continueBatchBtn) {
         continueBatchBtn.style.display = options.hasNextBatch ? "inline-flex" : "none";
+    }
+    if (continueBatchTopBtn) {
+        continueBatchTopBtn.style.display = options.hasNextBatch ? "inline-flex" : "none";
     }
     renderBatchResults(lastOutputResults);
 }
