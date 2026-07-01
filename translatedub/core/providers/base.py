@@ -33,3 +33,36 @@ class TTSProvider(Protocol):
                    voice_config: dict, speaking_rate: float) -> None:
         """Synthesize one segment to ``output_path``; raise on failure."""
         ...
+
+
+@runtime_checkable
+class ASRProvider(Protocol):
+    """One speech-to-text engine. ``config`` carries resolution inputs
+    (``gemini_key``, ``whisper_model``)."""
+
+    name: str
+    premium: bool
+
+    def is_available(self, config: dict) -> "tuple[bool, str]":
+        ...
+
+    def transcribe(self, audio_path: str, src_lang: str,
+                   log=None) -> list:
+        """Return subtitles with ``original_text`` filled (``translated_text`` empty)."""
+        ...
+
+
+@runtime_checkable
+class TranslateProvider(Protocol):
+    """One translation engine. ``config`` carries resolution inputs (``gemini_key``)."""
+
+    name: str
+    premium: bool
+
+    def is_available(self, config: dict) -> "tuple[bool, str]":
+        ...
+
+    def translate(self, subtitles: list, src_lang: str, target_lang: str,
+                  log=None) -> list:
+        """Fill ``translated_text`` on each subtitle in place; return the list."""
+        ...
