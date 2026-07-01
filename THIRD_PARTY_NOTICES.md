@@ -51,6 +51,14 @@ Direct runtime dependencies declared in `pyproject.toml`:
 * **pydub** (MIT) — Copyright (c) 2011 James Robert
 * **imageio-ffmpeg** (BSD 2-Clause) — Copyright (c) 2018 imageio contributors
 
+Optional dependency (`translatedub[free]`):
+
+* **edge-tts** (LGPL-3.0-only) — Copyright (c) rany. Provides free neural voices
+  (including Vietnamese) via Microsoft Edge's online TTS service. Used as an **optional**
+  dependency and invoked **via its command-line interface as a subprocess**; its source is
+  **not vendored, not modified, and not statically or dynamically linked into** TranslateDub
+  AI. Project: <https://github.com/rany2/edge-tts>
+
 Optional dependency (`translatedub[cloud]`):
 
 * **google-cloud-texttospeech** (Apache-2.0) — Copyright (c) Google LLC
@@ -68,3 +76,6 @@ Each dependency is distributed under its own license; refer to each project for 
 * pyVideoTrans chỉ được ghi nhận là nguồn cảm hứng về workflow; repo không chứa và không
   phụ thuộc source/asset/binary của pyVideoTrans.
 * Các dependency Python có license riêng của chúng.
+* **edge-tts (LGPLv3)** là dependency **tùy chọn** (extra `[free]`), được gọi **qua CLI
+  bằng subprocess**, không nhúng/sửa/liên kết vào mã nguồn dự án - nên không phát sinh
+  nghĩa vụ mã nguồn của LGPL đối với TranslateDub AI.
