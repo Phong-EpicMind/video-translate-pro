@@ -44,7 +44,7 @@ jobs:
           translatedub config path
 
   hygiene:
-    name: Repository hygiene
+    name: Validate source and release hygiene
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
