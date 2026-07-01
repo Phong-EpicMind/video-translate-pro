@@ -52,6 +52,7 @@
                     <div class="form-group narration-setting">
                         <label for="ttsEngine">Động cơ thuyết minh</label>
                         <select id="ttsEngine">
+                            <option value="edge" {% if config.tts_engine == 'edge' %}selected{% endif %}>Edge Neural (Miễn Phí - Giọng Tự Nhiên)</option>
                             <option value="gtts" {% if config.tts_engine == 'gtts' %}selected{% endif %}>gTTS (Google Translate - Miễn Phí)</option>
                             <option value="google_cloud" {% if config.tts_engine == 'google_cloud' %}selected{% endif %}>Google Cloud TTS (Siêu Thực)</option>
                         </select>
@@ -114,7 +115,7 @@
                     </div>
 
                     <div class="form-group narration-setting" id="voiceNameGroup" style="display: none;">
-                        <label for="voiceName">Giọng đọc (Cloud TTS)</label>
+                        <label for="voiceName">Giọng đọc</label>
                         <select id="voiceName" class="styled-select"></select>
                     </div>
 

@@ -66,16 +66,31 @@ const PREMIUM_VOICES = {
     ]
 };
 
+// Free edge-tts neural voices (offered when the edge engine is selected).
+const EDGE_VOICES = {
+    "vi": [
+        { value: "vi-VN-HoaiMyNeural", label: "HoaiMy - Giọng Nữ (Neural)" },
+        { value: "vi-VN-NamMinhNeural", label: "NamMinh - Giọng Nam (Neural)" }
+    ]
+};
+
 function updateVoiceDropdown(lang) {
     if (!voiceName) return;
+    const previous = voiceName.value;
     voiceName.innerHTML = "";
-    const voices = PREMIUM_VOICES[lang] || PREMIUM_VOICES["vi"];
+    const isEdge = ttsEngine && ttsEngine.value === "edge";
+    const table = isEdge ? EDGE_VOICES : PREMIUM_VOICES;
+    const voices = table[lang] || table["vi"];
     voices.forEach(v => {
         const opt = document.createElement("option");
         opt.value = v.value;
         opt.textContent = v.label;
         voiceName.appendChild(opt);
     });
+    // Keep the prior selection when it is still valid after repopulating.
+    if (previous && voices.some(v => v.value === previous)) {
+        voiceName.value = previous;
+    }
 }
 
 // DOM Elements
@@ -546,6 +561,11 @@ function toggleTtsEngineGroups() {
     if (ttsEngine.value === "google_cloud") {
         gcpCredentialsGroup.style.display = "block";
         voiceNameGroup.style.display = "block";
+        updateVoiceDropdown(targetLang.value);
+    } else if (ttsEngine.value === "edge") {
+        gcpCredentialsGroup.style.display = "none";
+        voiceNameGroup.style.display = "block";
+        updateVoiceDropdown(targetLang.value);
     } else {
         gcpCredentialsGroup.style.display = "none";
         voiceNameGroup.style.display = "none";
