@@ -82,8 +82,11 @@ class EdgeTTSProvider:
         result = subprocess.run(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
-        if result.returncode != 0 or not os.path.exists(output_path):
-            raise RuntimeError(f"edge-tts failed: {(result.stderr or '').strip()[:200]}")
+        # Some edge-tts builds exit 0 yet write a 0-byte file on a server-side error
+        # (e.g. Microsoft returns HTTP 403), so an empty output counts as failure too.
+        empty = (not os.path.exists(output_path)) or os.path.getsize(output_path) == 0
+        if result.returncode != 0 or empty:
+            raise RuntimeError(f"edge-tts failed: {(result.stderr or '').strip()[-200:]}")
 
 
 class GoogleCloudProvider:

@@ -73,7 +73,8 @@ def test_edge_synthesize_invokes_cli(monkeypatch, tmp_path):
     def fake_run(cmd, **kw):
         seen["cmd"] = cmd
         idx = cmd.index("--write-media") + 1
-        open(cmd[idx], "wb").close()
+        with open(cmd[idx], "wb") as f:
+            f.write(b"audio-bytes")
         return type("R", (), {"returncode": 0, "stderr": ""})()
 
     monkeypatch.setattr(prov.subprocess, "run", fake_run)
@@ -91,6 +92,20 @@ def test_edge_synthesize_missing_output_raises(monkeypatch, tmp_path):
 
     def fake_run(cmd, **kw):
         return type("R", (), {"returncode": 1, "stderr": "boom"})()  # no file written
+
+    monkeypatch.setattr(prov.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError):
+        prov.get_tts_provider("edge").synthesize("hi", "vi", str(tmp_path / "x.mp3"), {}, 1.0)
+
+
+def test_edge_synthesize_empty_output_raises(monkeypatch, tmp_path):
+    """Some builds exit 0 but write a 0-byte file on a 403; treat as failure."""
+    monkeypatch.setattr(prov, "_edge_cli", lambda: "/usr/bin/edge-tts")
+
+    def fake_run(cmd, **kw):
+        idx = cmd.index("--write-media") + 1
+        open(cmd[idx], "wb").close()  # exit 0 but empty file
+        return type("R", (), {"returncode": 0, "stderr": "403 forbidden"})()
 
     monkeypatch.setattr(prov.subprocess, "run", fake_run)
     with pytest.raises(RuntimeError):
