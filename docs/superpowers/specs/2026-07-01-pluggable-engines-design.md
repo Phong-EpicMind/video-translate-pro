@@ -178,7 +178,7 @@ promise while never surprising a user who deliberately picked a premium voice.
 
 ---
 
-## Phase B — outline (free ASR + translate, `[local]` extra)
+## Phase B — outline (free ASR + translate, added to the `[free]` extra)
 
 - Split the combined Gemini `transcribe_and_translate` into two provider stages:
   - **ASR**: `WhisperProvider` (faster-whisper, `[local]`) returns original text +
@@ -186,8 +186,8 @@ promise while never surprising a user who deliberately picked a premium voice.
   - **Translate**: `GoogleFreeProvider` (deep-translator) and `GeminiTranslateProvider`.
   - A **combined** capability lets Gemini keep doing ASR+translate in one call when both
     stages are set to Gemini (no double cost/latency regression).
-- `[local]` extra: `faster-whisper` (MIT) + `deep-translator` (Apache-2.0). Model weights
-  (Whisper, MIT) download on first use.
+- `[free]` extra gains `faster-whisper` (MIT) + `deep-translator` (Apache-2.0). Model
+  weights (Whisper, MIT) download on first use.
 - Full zero-key stack after this phase: faster-whisper + deep-translator + edge-tts.
 
 ## Phase C — outline (premium TTS)
@@ -196,10 +196,10 @@ promise while never surprising a user who deliberately picked a premium voice.
   new secret keys added to `SECRET_KEYS` and `_ENV_OVERRIDES`). Both `supports_native_rate`
   handling per their APIs. No license risk (user brings key, accepts provider ToS).
 
-## Open questions
+## Resolved decisions (2026-07-01)
 
-- edge-tts default Vietnamese voice: `vi-VN-HoaiMyNeural` (female) chosen as default;
-  confirm we expose `vi-VN-NamMinhNeural` (male) as the alternate in the UI voice list.
-- Whether `[free]` should be the single umbrella extra for all zero-key engines (edge in
-  A, faster-whisper + deep-translator in B) or split into `[free]`/`[local]`. Leaning
-  toward one `[free]` umbrella for the simplest onboarding message.
+- **Default Vietnamese voice:** `vi-VN-HoaiMyNeural` (female). Expose
+  `vi-VN-NamMinhNeural` (male) as the alternate in the UI voice list.
+- **Packaging:** a **single `[free]` umbrella extra** for all zero-key engines — edge-tts
+  in Phase A, faster-whisper + deep-translator added to the same extra in Phase B. One
+  onboarding command: `pip install translatedub[free]`. (No separate `[local]` extra.)
