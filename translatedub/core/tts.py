@@ -12,7 +12,7 @@ import os
 from typing import Callable
 
 from .media import change_tempo, get_duration
-from .providers.tts import resolve_tts_provider
+from .providers.tts import get_tts_provider, resolve_tts_provider
 
 LogCallback = Callable[[str], None]
 
@@ -25,6 +25,24 @@ def _clamp(value: float, low: float = MIN_SPEED, high: float = MAX_SPEED) -> flo
     return max(low, min(high, value))
 
 
+def _synthesize(provider, text, lang, output_path, voice_config, speed,
+                log: LogCallback | None):
+    """Synthesise with ``provider``; on a free-engine runtime failure fall back
+    to gTTS (a deliberate premium engine still fails loudly). Returns the
+    provider that actually produced the audio."""
+    try:
+        provider.synthesize(text, lang, output_path, voice_config, speed)
+        return provider
+    except Exception as exc:  # noqa: BLE001 - decide whether to degrade
+        if provider.premium or provider.name == "gtts":
+            raise
+        fallback = get_tts_provider("gtts")
+        if log:
+            log(f"{provider.name} synthesis failed ({exc}); falling back to gtts.")
+        fallback.synthesize(text, lang, output_path, voice_config, speed)
+        return fallback
+
+
 def synthesize_segment(text: str, lang: str, engine: str, output_path: str,
                        voice_config: dict | None = None,
                        target_duration_ms: int | None = None,
@@ -34,7 +52,8 @@ def synthesize_segment(text: str, lang: str, engine: str, output_path: str,
     voice_config = voice_config or {}
     try:
         provider = resolve_tts_provider(engine, voice_config, log)
-        provider.synthesize(text, lang, output_path, voice_config, base_speed)
+        provider = _synthesize(provider, text, lang, output_path, voice_config,
+                               base_speed, log)
 
         if not os.path.exists(output_path):
             return False
