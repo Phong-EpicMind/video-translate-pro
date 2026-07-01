@@ -9,14 +9,21 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
 # Environment
 venv/
 .venv/
+env/
 .env
 .env.*
 !.env.example
 
-# Application Temporary files (crucial to prevent repo bloating)
+# Application data & generated media (never commit)
 temp/
 *.mp3
 *.mp4
@@ -25,25 +32,20 @@ temp/
 *.avi
 *.srt
 
-# Confidential configurations (highly critical to protect API Keys and GCP Credentials)
+# Secrets (API keys, service account JSON)
 config.json
 *.service-account.json
 *credentials*.json
 *secret*.json
 
-# macOS files
+# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 
-# PyInstaller Desktop Build artifacts
-TranslateDub AI.app/
-TranslateDub AI.spec
-build/
-dist/
-release-artifacts/
-static/icon.icns
+# Legacy desktop-build artifacts (no longer produced)
+*.app/
 *.dmg
-
-# Bundled binaries
+*.spec
 bin/
+release-artifacts/

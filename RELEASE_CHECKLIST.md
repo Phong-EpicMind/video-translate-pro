@@ -1,98 +1,73 @@
 # Release Checklist
 
-Use this checklist before publishing a GitHub Release or making the repository public.
+TranslateDub AI ships as a Python package on PyPI. No code signing or notarization is
+required — installs are via `pip`/`pipx`/`uvx`, so there is no Gatekeeper/SmartScreen
+friction and no bundled-binary license obligation.
 
-## Source Release
+## Before tagging
 
-* Confirm `git status --short` is clean.
-* Confirm no generated media, API keys, service account JSON, `.app`, `.dmg`, `dist/`, `build/`, `bin/`, `temp/`, `venv/`, `config.json`, or release artifacts are tracked.
-* Run:
+* `git status --short` is clean.
+* No secret-like files tracked (`config.json`, service-account JSON, API keys). The CI
+  hygiene job enforces this.
+* Bump the version in both `pyproject.toml` and `translatedub/__init__.py`.
+* Update any user-facing docs (README) if flags or behavior changed.
 
-```bash
-python -m compileall -q app.py desktop.py utils.py ptts_fallback.py scratch
-python -m bandit -r app.py desktop.py utils.py ptts_fallback.py scratch -ll
-```
-
-## Packaged macOS Release
-
-* Build with the README PyInstaller command so `LICENSE`, `THIRD_PARTY_NOTICES.md`, `FFMPEG_SOURCE_OFFER.md`, and bundled FFmpeg/FFprobe are included in the app bundle.
-* Set `CFBundleIdentifier`, `CFBundleShortVersionString`, and `CFBundleVersion`.
-* Verify bundled FFmpeg/FFprobe version:
+## Verify locally
 
 ```bash
-dist/TranslateDub\ AI.app/Contents/Frameworks/bin/ffmpeg -version
-dist/TranslateDub\ AI.app/Contents/Frameworks/bin/ffprobe -version
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev,cloud]"
+pytest
+python -m bandit -q -r translatedub -ll
+translatedub --version
+translatedub serve --no-browser   # smoke test, then Ctrl+C
 ```
 
-* Verify the app bundle signature:
+## Build and publish to PyPI
 
 ```bash
-codesign --verify --deep --strict --verbose=2 "dist/TranslateDub AI.app"
+python -m pip install --upgrade build twine
+python -m build                    # builds sdist + wheel into dist/
+python -m twine check dist/*
+# Test on TestPyPI first (optional):
+# python -m twine upload --repository testpypi dist/*
+python -m twine upload dist/*
 ```
 
-* Verify the `.dmg`:
+## Tag and release
 
 ```bash
-hdiutil verify "release-artifacts/TranslateDub_AI_macOS_arm64_vX.Y.Z.dmg"
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
-* Confirm the release bundle does not contain `config.json`, service account JSON, or secret-like files.
-* If the `.dmg` contains FFmpeg/FFprobe binaries, attach the corresponding FFmpeg source archive to the same GitHub Release, or include a written source offer valid for at least three years.
-* Attach `LICENSE`, `THIRD_PARTY_NOTICES.md`, `FFMPEG_SOURCE_OFFER.md`, `SHA256SUMS.txt`, and the FFmpeg corresponding source archive to the release.
-* Do not advertise the app as endorsed by Google, pyVideoTrans, Apple, or any third-party service.
-* State clearly whether the build is Apple Developer ID signed/notarized.
-
-## Suggested Release Assets
-
-* `TranslateDub_AI_macOS_arm64_vX.Y.Z.dmg`
-* `SHA256SUMS.txt`
-* `LICENSE`
-* `THIRD_PARTY_NOTICES.md`
-* `FFMPEG_SOURCE_OFFER.md`
-* `ffmpeg-N-124530-gf435ce22e1-corresponding-source.tar.xz` when FFmpeg/FFprobe are bundled
+* Create a GitHub Release for the tag with a short changelog.
+* Attach `LICENSE` and `THIRD_PARTY_NOTICES.md` is already in the repo; no binaries to attach.
+* Do not advertise the app as endorsed by Google, pyVideoTrans, Apple, or any third party.
 
 ---
 
 ## Tiếng Việt
 
-Dùng checklist này trước khi publish GitHub Release hoặc public repo.
+TranslateDub AI phát hành dạng gói Python trên PyPI. Không cần ký app hay notarize.
 
-### Source release
+### Trước khi tag
 
-* Xác nhận `git status --short` sạch.
-* Xác nhận không track generated media, API key, Service Account JSON, `.app`, `.dmg`, `dist/`, `build/`, `bin/`, `temp/`, `venv/`, `config.json`, hoặc release artifacts.
-* Chạy:
+* `git status --short` sạch.
+* Không track file giống secret (`config.json`, service-account JSON, API key). CI job
+  hygiene sẽ chặn nếu có.
+* Tăng version ở cả `pyproject.toml` và `translatedub/__init__.py`.
+* Cập nhật README nếu đổi flag hoặc hành vi.
 
-```bash
-python -m compileall -q app.py desktop.py utils.py ptts_fallback.py scratch
-python -m bandit -r app.py desktop.py utils.py ptts_fallback.py scratch -ll
-```
-
-### Bản đóng gói macOS
-
-* Build theo lệnh PyInstaller trong README để app bundle có kèm `LICENSE`, `THIRD_PARTY_NOTICES.md`, `FFMPEG_SOURCE_OFFER.md`, và FFmpeg/FFprobe nếu bundle.
-* Set `CFBundleIdentifier`, `CFBundleShortVersionString`, và `CFBundleVersion`.
-* Kiểm tra version FFmpeg/FFprobe:
+### Kiểm tra & phát hành
 
 ```bash
-dist/TranslateDub\ AI.app/Contents/Frameworks/bin/ffmpeg -version
-dist/TranslateDub\ AI.app/Contents/Frameworks/bin/ffprobe -version
+pip install -e ".[dev,cloud]" && pytest
+python -m bandit -q -r translatedub -ll
+python -m build && python -m twine check dist/*
+python -m twine upload dist/*        # cần tài khoản PyPI
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-* Kiểm tra code signature của app:
-
-```bash
-codesign --verify --deep --strict --verbose=2 "dist/TranslateDub AI.app"
-```
-
-* Kiểm tra file `.dmg`:
-
-```bash
-hdiutil verify "release-artifacts/TranslateDub_AI_macOS_arm64_vX.Y.Z.dmg"
-```
-
-* Xác nhận bundle release không có `config.json`, Service Account JSON, hoặc file giống secret.
-* Nếu `.dmg` có kèm FFmpeg/FFprobe, phải attach FFmpeg source archive tương ứng vào cùng GitHub Release, hoặc có written source offer hợp lệ ít nhất 3 năm.
-* Attach `LICENSE`, `THIRD_PARTY_NOTICES.md`, `FFMPEG_SOURCE_OFFER.md`, `SHA256SUMS.txt`, và FFmpeg corresponding source archive vào release.
-* Không quảng cáo app như được Google, pyVideoTrans, Apple, hoặc dịch vụ bên thứ ba nào endorse.
-* Nói rõ build đã Apple Developer ID signed/notarized hay chưa.
+* Tạo GitHub Release cho tag kèm changelog ngắn. Không cần attach binary.
+* Không quảng cáo app như được Google, pyVideoTrans, Apple endorse.

@@ -1195,15 +1195,20 @@ async function revealLastOutputInFinder() {
         showToast("Chưa có file xuất ra.");
         return;
     }
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.reveal_in_finder) {
-        const result = await window.pywebview.api.reveal_in_finder(lastOutputPath);
+    try {
+        const response = await fetch("/api/reveal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: lastOutputPath }),
+        });
+        const result = await response.json();
         if (result && result.ok) {
-            showToast("Đã mở Finder tại file xuất ra.");
+            showToast("Đã mở thư mục chứa file xuất ra.");
         } else {
-            showToast(result && result.error ? result.error : "Không mở được Finder.");
+            showToast(result && result.error ? result.error : "Không mở được thư mục.");
         }
-    } else {
-        showToast("Chạy bản desktop để dùng nút Hiện trong Finder.");
+    } catch (err) {
+        showToast("Không mở được thư mục chứa file.");
     }
 }
 
