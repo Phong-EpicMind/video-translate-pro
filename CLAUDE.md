@@ -37,7 +37,10 @@ translatedub/
     subtitles.py    Subtitle dataclass + SRT helpers
     media.py        ffmpeg ops: extract audio, probe, mux, subtitles
     transcribe.py   Gemini transcription + translation (chunked, retried)
-    tts.py          gTTS + Google Cloud TTS (+ duration matching)
+    tts.py          TTS orchestrator (duration matching) over the provider registry
+    providers/      pluggable engine seam
+      base.py       TTSProvider protocol + ProviderUnavailable
+      tts.py        edge / gTTS / Google Cloud providers, registry, resolution
     assemble.py     overlay per-segment TTS clips into one dubbed track
   web/
     server.py       FastAPI app; same SSE/JSON contract the frontend expects
@@ -57,24 +60,32 @@ obfuscation). Env vars: `TRANSLATEDUB_GEMINI_KEY`/`GEMINI_API_KEY`,
 `TRANSLATEDUB_GOOGLE_CLOUD_CREDENTIALS`/`GOOGLE_APPLICATION_CREDENTIALS`.
 `config.public_config()` must never expose secret values — only `has_*` booleans.
 
-## Engine roadmap (planned pluggable providers)
+## Engine roadmap (pluggable providers)
 
 Goal: a provider abstraction so each pipeline stage (ASR / translate / TTS) can swap
 engines, with a **zero-key default stack** and optional premium providers. Model after
-pyVideoTrans (~18k stars) and VideoLingo (~16k stars).
+pyVideoTrans (~18k stars) and VideoLingo (~16k stars). Specs/plans live in
+`docs/superpowers/specs/2026-07-01-pluggable-engines-design.md` and
+`docs/superpowers/plans/2026-07-01-pluggable-engines-phase-a.md`.
 
 | Stage | Free default (no key) | Premium (opt-in, user's own key) |
 | --- | --- | --- |
-| Transcribe | faster-whisper (local) | Gemini, OpenAI |
-| Translate | deep-translator (Google free) | Gemini/LLM |
-| TTS | **edge-tts** (free neural voices, incl. Vietnamese) | Google Cloud, OpenAI TTS, ElevenLabs |
+| Transcribe | faster-whisper (local) — *Phase B* | Gemini (shipped), OpenAI |
+| Translate | deep-translator (Google free) — *Phase B* | Gemini/LLM (shipped) |
+| TTS | **edge-tts** (free neural voices, incl. Vietnamese) — **shipped, default** | Google Cloud (shipped), OpenAI TTS, ElevenLabs — *Phase C* |
 
-- edge-tts should become the default free voice (replaces gTTS as default; gTTS may stay
-  as a fallback).
-- Package extras: heavy/optional engines behind extras (`[local]` for faster-whisper,
-  `[cloud]` for Google Cloud, etc.) so the base install stays light. First-run with no
-  engine configured should guide the user: "free & private → `pip install ...[local]`"
-  vs "cloud → add a key".
+- **Phase A (DONE):** TTS provider seam in `core/providers/` (`TTSProvider` protocol +
+  registry + `resolve_tts_provider`). **edge-tts is the shipped default** free voice
+  (default VN voice `vi-VN-HoaiMyNeural`), invoked via its CLI. gTTS is the graceful
+  fallback; free engines degrade, premium engines fail loudly. Default VN voice + single
+  `[free]` extra were the locked spec decisions.
+- **Package extras:** a single umbrella `[free]` extra holds all zero-key engines
+  (edge-tts now; faster-whisper + deep-translator added in Phase B). `[cloud]` = Google
+  Cloud. Base install stays light. First-run guidance: "free & natural →
+  `pip install translatedub[free]`" vs "cloud → add a key".
+- **Phase B (next):** split the combined Gemini transcribe+translate into ASR + translate
+  provider stages; add faster-whisper + deep-translator for a full zero-key pipeline.
+- **Phase C:** premium OpenAI TTS + ElevenLabs providers.
 
 ## Licensing rules (CRITICAL — the maintainer is strict about this)
 
