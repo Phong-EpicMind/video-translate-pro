@@ -19,7 +19,7 @@ from pathlib import Path
 DEFAULT_SETTINGS = {
     "src_lang": "auto",
     "target_lang": "vi",
-    "tts_engine": "gtts",
+    "tts_engine": "edge",
     "voice_name": "",
     "base_speed": 1.0,
     "match_duration": True,
@@ -135,10 +135,14 @@ def has_secret(name: str, config: dict | None = None) -> bool:
 
 def public_config(config: dict | None = None) -> dict:
     """Settings safe to expose to the UI: no secret values, only presence flags."""
+    from .core.providers.tts import available_tts_engines
+
     data = config if config is not None else load_config()
     result = {key: data.get(key, default) for key, default in DEFAULT_SETTINGS.items()}
     result["has_gemini_key"] = has_secret("gemini_key", data)
     result["has_google_cloud_credentials"] = has_secret("google_cloud_credentials", data)
+    creds = get_secret("google_cloud_credentials", data)
+    result["tts_engines"] = available_tts_engines({"credentials_json": creds})
     return result
 
 
