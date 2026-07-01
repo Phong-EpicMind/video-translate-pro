@@ -22,12 +22,37 @@ from .core import (
     transcribe_and_translate,
     write_srt,
 )
+from .core.providers import resolve_asr_provider, resolve_translate_provider
 
 LogCallback = Callable[[str], None]
 
 
+def transcribe_translate(audio_path: str, src_lang: str, target_lang: str, *,
+                         gemini_key: str = "", asr_engine: str = "auto",
+                         translate_engine: str = "auto", whisper_model: str = "small",
+                         log: LogCallback | None = None) -> list[Subtitle]:
+    """Transcribe + translate an audio file via the resolved ASR/translate engines.
+
+    When both stages resolve to Gemini, the single combined call is used (cheapest);
+    otherwise ASR runs first, then translation.
+    """
+    cfg = {"gemini_key": gemini_key, "whisper_model": whisper_model}
+    asr = resolve_asr_provider(asr_engine, cfg, log)
+    translator = resolve_translate_provider(translate_engine, cfg, log)
+
+    if asr.name == "gemini" and translator.name == "gemini":
+        return transcribe_and_translate(audio_path, gemini_key, src_lang, target_lang, log)
+
+    subtitles = asr.transcribe(audio_path, src_lang, log)
+    if not subtitles:
+        return []
+    return translator.translate(subtitles, src_lang, target_lang, log)
+
+
 def translate_video(video_path: str, src_lang: str, target_lang: str,
-                    gemini_key: str, log: LogCallback | None = None) -> list[Subtitle]:
+                    gemini_key: str = "", log: LogCallback | None = None, *,
+                    asr_engine: str = "auto", translate_engine: str = "auto",
+                    whisper_model: str = "small") -> list[Subtitle]:
     """Extract audio and produce translated subtitles for a video."""
     config.ensure_dirs()
     stem = os.path.splitext(os.path.basename(video_path))[0]
@@ -38,13 +63,17 @@ def translate_video(video_path: str, src_lang: str, target_lang: str,
     if not extract_audio(video_path, audio_path, log):
         raise RuntimeError("Audio extraction failed.")
 
-    if log:
-        log("Transcribing and translating with Gemini...")
-    subtitles = transcribe_and_translate(audio_path, gemini_key, src_lang, target_lang, log)
     try:
-        os.remove(audio_path)
-    except OSError:
-        pass
+        subtitles = transcribe_translate(
+            audio_path, src_lang, target_lang, gemini_key=gemini_key,
+            asr_engine=asr_engine, translate_engine=translate_engine,
+            whisper_model=whisper_model, log=log,
+        )
+    finally:
+        try:
+            os.remove(audio_path)
+        except OSError:
+            pass
     if not subtitles:
         raise RuntimeError("No subtitles were produced.")
     return subtitles

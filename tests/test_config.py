@@ -70,6 +70,18 @@ def test_default_tts_engine_is_edge():
     assert config.DEFAULT_SETTINGS["tts_engine"] == "edge"
 
 
+def test_default_asr_translate_engines_are_auto():
+    assert config.DEFAULT_SETTINGS["asr_engine"] == "auto"
+    assert config.DEFAULT_SETTINGS["translate_engine"] == "auto"
+    assert config.DEFAULT_SETTINGS["whisper_model"] == "small"
+
+
+def test_public_config_lists_asr_and_translate_engines(isolated_home):
+    pub = config.public_config()
+    assert {e["name"] for e in pub["asr_engines"]} == {"whisper", "gemini"}
+    assert {e["name"] for e in pub["translate_engines"]} == {"google_free", "gemini"}
+
+
 def test_public_config_lists_engines_without_secrets(isolated_home):
     config.set_secret("gemini_key", "topsecret")
     pub = config.public_config()

@@ -19,6 +19,9 @@ from pathlib import Path
 DEFAULT_SETTINGS = {
     "src_lang": "auto",
     "target_lang": "vi",
+    "asr_engine": "auto",
+    "translate_engine": "auto",
+    "whisper_model": "small",
     "tts_engine": "edge",
     "voice_name": "",
     "base_speed": 1.0,
@@ -135,6 +138,8 @@ def has_secret(name: str, config: dict | None = None) -> bool:
 
 def public_config(config: dict | None = None) -> dict:
     """Settings safe to expose to the UI: no secret values, only presence flags."""
+    from .core.providers.asr import available_asr_engines
+    from .core.providers.translate import available_translate_engines
     from .core.providers.tts import available_tts_engines
 
     data = config if config is not None else load_config()
@@ -142,7 +147,10 @@ def public_config(config: dict | None = None) -> dict:
     result["has_gemini_key"] = has_secret("gemini_key", data)
     result["has_google_cloud_credentials"] = has_secret("google_cloud_credentials", data)
     creds = get_secret("google_cloud_credentials", data)
+    gemini_cfg = {"gemini_key": get_secret("gemini_key", data)}
     result["tts_engines"] = available_tts_engines({"credentials_json": creds})
+    result["asr_engines"] = available_asr_engines(gemini_cfg)
+    result["translate_engines"] = available_translate_engines(gemini_cfg)
     return result
 
 
