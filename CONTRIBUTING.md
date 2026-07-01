@@ -1,71 +1,68 @@
 # Contributing
 
-Thanks for helping improve TranslateDub AI. This project values focused, security-conscious changes that keep the macOS app reliable for creators.
+Thanks for helping improve TranslateDub AI. This project values focused,
+security-conscious changes that keep the cross-platform tool reliable.
 
-## Development Setup
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python -m compileall -q app.py desktop.py utils.py ptts_fallback.py scratch
-```
-
-Install FFmpeg locally for development:
+## Development setup
 
 ```bash
-brew install ffmpeg
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e ".[dev,cloud]"
+pytest
 ```
 
-## Pull Request Standard
+FFmpeg is resolved automatically (system binary or `imageio-ffmpeg`). To use a system
+build during development: `brew install ffmpeg` / `apt install ffmpeg` / `winget install ffmpeg`.
+
+## Pull request standard
 
 Before opening a pull request:
 
-* Keep secrets out of the repository. Do not commit API keys, service account JSON, generated videos, temporary audio, `.dmg`, `.app`, `dist/`, `build/`, `bin/`, or `config.json`.
-* Run the compile check above.
+* Keep secrets out of the repository. Never commit API keys, service-account JSON,
+  generated media, temporary audio/video, or `config.json`.
+* Run `pytest` (and `bandit -r translatedub -ll`) and keep them green.
+* Add or update tests for the behavior you change. Pure logic must stay unit-tested.
 * Keep changes scoped. Avoid unrelated formatting churn.
-* Update `README.md`, `THIRD_PARTY_NOTICES.md`, or `FFMPEG_SOURCE_OFFER.md` when changing packaging, bundled binaries, licensing behavior, or user-facing release instructions.
-* For binary releases containing FFmpeg/FFprobe, provide the corresponding FFmpeg source archive or a valid written source offer.
+* Update `README.md` and `THIRD_PARTY_NOTICES.md` when changing packaging, dependencies,
+  licensing behavior, or user-facing commands.
 
-## Legal And Attribution Notes
+## Legal and attribution
 
-TranslateDub AI source code is MIT licensed. Packaged releases may contain third-party components under other licenses, including GPL-3.0 FFmpeg/FFprobe binaries. Do not remove or weaken the third-party notices.
+TranslateDub AI source code is MIT licensed. Do not remove or weaken the third-party
+notices. FFmpeg is not bundled by this project; it is provided by the system or by the
+`imageio-ffmpeg` dependency under its own license.
 
-pyVideoTrans is credited as inspiration only. This project must not import, vendor, copy, or depend on pyVideoTrans source code, assets, or binaries unless the licensing model is explicitly revisited.
+pyVideoTrans is credited as inspiration only. This project must not import, vendor,
+copy, or depend on pyVideoTrans source code, assets, or binaries.
 
 ---
 
 ## Tiếng Việt
 
-Cảm ơn bạn đã đóng góp cho TranslateDub AI. Dự án ưu tiên các thay đổi gọn, có kiểm tra, và không làm yếu phần bảo mật của ứng dụng macOS.
+Cảm ơn bạn đã đóng góp cho TranslateDub AI. Dự án ưu tiên thay đổi gọn, có kiểm tra, và
+không làm yếu phần bảo mật.
 
-### Cài đặt môi trường phát triển
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python -m compileall -q app.py desktop.py utils.py ptts_fallback.py scratch
-```
-
-Cài FFmpeg cho môi trường dev:
+### Cài đặt môi trường
 
 ```bash
-brew install ffmpeg
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e ".[dev,cloud]"
+pytest
 ```
+
+FFmpeg tự lo (binary hệ thống hoặc `imageio-ffmpeg`).
 
 ### Tiêu chuẩn Pull Request
 
-Trước khi mở PR:
+* Không commit secret (API key, service-account JSON, media, `config.json`).
+* Chạy `pytest` và `bandit -r translatedub -ll`, giữ xanh.
+* Thêm/cập nhật test cho phần bạn đổi. Logic thuần phải có unit test.
+* Giữ thay đổi đúng phạm vi.
+* Cập nhật `README.md`, `THIRD_PARTY_NOTICES.md` khi đổi đóng gói/dependency/license/lệnh.
 
-* Không commit secret. Không đưa API key, Service Account JSON, video/audio tạm, `.dmg`, `.app`, `dist/`, `build/`, `bin/`, hoặc `config.json` vào repo.
-* Chạy compile check ở trên.
-* Giữ thay đổi đúng phạm vi. Không format/refactor ngoài lề nếu không cần.
-* Cập nhật `README.md`, `THIRD_PARTY_NOTICES.md`, hoặc `FFMPEG_SOURCE_OFFER.md` nếu thay đổi cách đóng gói, binary bundle, license, hoặc hướng dẫn release.
-* Nếu release binary có kèm FFmpeg/FFprobe, phải kèm source archive tương ứng hoặc written source offer hợp lệ.
+### Pháp lý
 
-### Pháp lý và ghi nhận
-
-Source code của TranslateDub AI dùng MIT License. Bản đóng gói có thể kèm thành phần bên thứ ba theo license riêng, gồm FFmpeg/FFprobe GPL-3.0. Không xóa hoặc làm yếu các third-party notices.
-
-pyVideoTrans chỉ được ghi nhận là nguồn cảm hứng. Dự án này không được import, vendor, copy, hoặc phụ thuộc source code, asset, hay binary của pyVideoTrans nếu chưa xem lại rõ mô hình license.
+Source code MIT. Dự án không bundle FFmpeg. pyVideoTrans chỉ là nguồn cảm hứng; không
+import/vendor/copy/phụ thuộc.

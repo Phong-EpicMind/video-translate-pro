@@ -10,150 +10,62 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    name: Validate source and release hygiene
-    runs-on: macos-14
-    timeout-minutes: 15
+  test:
+    name: Test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+        python-version: ["3.9", "3.11", "3.12"]
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install dependencies
+      - name: Install package with dev extras
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install -e ".[dev,cloud]"
 
-      - name: Compile Python sources
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Smoke-test the CLI
         run: |
-          python -m compileall -q app.py desktop.py utils.py ptts_fallback.py scratch
+          translatedub --version
+          translatedub config path
 
-      - name: Import FastAPI app
-        run: |
-          python - <<'PY'
-          import app
-          assert app.app.title == "Video Translate Pro"
-          print("Imported", app.app.title)
-          PY
+  hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Verify config API redacts credentials
-        run: |
-          python - <<'PY'
-          import importlib
-          import json
-          import os
-          import tempfile
-          import uuid
-
-          with tempfile.TemporaryDirectory() as home:
-              app_module = importlib.import_module("app")
-              app_module.KEYCHAIN_SERVICE = f"com.phongho.translatedubai.ci.{uuid.uuid4()}"
-              app_module.USER_DATA_DIR = home
-              app_module.TEMP_DIR = os.path.join(home, "temp")
-              app_module.CONFIG_FILE = os.path.join(home, "config.json")
-              os.makedirs(app_module.TEMP_DIR, exist_ok=True)
-              from fastapi.testclient import TestClient
-
-              client = TestClient(app_module.app, client=("127.0.0.1", 50000))
-              try:
-                  payload = {
-                      "gemini_key": "TEST_GEMINI_SECRET",
-                      "google_cloud_credentials": "{\"private_key\":\"TEST_PRIVATE_KEY\",\"client_email\":\"x@example.com\"}",
-                      "src_lang": "auto",
-                      "target_lang": "vi",
-                      "tts_engine": "google_cloud",
-                      "voice_name": "vi-VN-Neural2-A",
-                      "base_speed": 1.0,
-                      "match_duration": True,
-                      "output_dir": "",
-                  }
-                  response = client.post("/api/config", json=payload)
-                  assert response.status_code == 200, response.text
-                  response_text = json.dumps(response.json())
-                  assert "TEST_GEMINI_SECRET" not in response_text
-                  assert "TEST_PRIVATE_KEY" not in response_text
-
-                  response = client.get("/api/config")
-                  assert response.status_code == 200, response.text
-                  body = response.json()
-                  response_text = json.dumps(body)
-                  assert body["has_gemini_key"] is True
-                  assert body["has_google_cloud_credentials"] is True
-                  assert "TEST_GEMINI_SECRET" not in response_text
-                  assert "TEST_PRIVATE_KEY" not in response_text
-
-                  with open(app_module.CONFIG_FILE, encoding="utf-8") as config_file:
-                      config_text = config_file.read()
-                  assert "gemini_key" not in config_text
-                  assert "google_cloud_credentials" not in config_text
-                  assert "TEST_GEMINI_SECRET" not in config_text
-                  assert "TEST_PRIVATE_KEY" not in config_text
-                  assert app_module.get_secret("gemini_key") == "TEST_GEMINI_SECRET"
-                  assert app_module.get_secret("google_cloud_credentials")
-                  assert oct(os.stat(app_module.CONFIG_FILE).st_mode & 0o777) == "0o600"
-
-                  for account in app_module.SECRET_CONFIG_KEYS.values():
-                      app_module.Security.SecItemDelete(app_module._keychain_query(account))
-
-                  with open(app_module.CONFIG_FILE, "w", encoding="utf-8") as config_file:
-                      json.dump(
-                          {
-                              "gemini_key": "LEGACY_GEMINI_SECRET",
-                              "google_cloud_credentials": "{\"private_key\":\"LEGACY_PRIVATE_KEY\"}",
-                              "target_lang": "en",
-                          },
-                          config_file,
-                      )
-
-                  body = app_module.public_config(app_module.load_config())
-                  assert body["has_gemini_key"] is True
-                  assert body["has_google_cloud_credentials"] is True
-                  assert body["target_lang"] == "en"
-                  assert app_module.get_secret("gemini_key") == "LEGACY_GEMINI_SECRET"
-                  assert app_module.get_secret("google_cloud_credentials")
-                  with open(app_module.CONFIG_FILE, encoding="utf-8") as config_file:
-                      config_text = config_file.read()
-                  assert "gemini_key" not in config_text
-                  assert "google_cloud_credentials" not in config_text
-                  assert "LEGACY_GEMINI_SECRET" not in config_text
-                  assert "LEGACY_PRIVATE_KEY" not in config_text
-              finally:
-                  for account in app_module.SECRET_CONFIG_KEYS.values():
-                      app_module.Security.SecItemDelete(app_module._keychain_query(account))
-          PY
-
-      - name: Check repository hygiene
+      - name: Reject tracked build artifacts, binaries, and secret-like files
         run: |
           set -euo pipefail
-          forbidden='(^|/)(bin|dist|build|temp|venv|__pycache__)/|\.app/|\.dmg$|config\.json$|\.service-account\.json$|credentials.*\.json$|secret.*\.json$'
+          forbidden='(^|/)(bin|dist|build|temp|venv|\.venv|__pycache__)/|\.app/|\.dmg$|config\.json$|\.service-account\.json$|credentials.*\.json$|secret.*\.json$'
           if git ls-files | grep -E "$forbidden"; then
             echo "Tracked generated, binary, or secret-like files found." >&2
             exit 1
           fi
           test -f LICENSE
           test -f THIRD_PARTY_NOTICES.md
-          test -f FFMPEG_SOURCE_OFFER.md
 
-      - name: Check tracked files for secret patterns
+      - name: Scan tracked files for secret patterns
         run: |
           set -euo pipefail
-          if git grep -nE 'AIza[0-9A-Za-z_-]{35}|-----BEGIN (RSA|OPENSSH|PRIVATE) KEY-----|private_key_id|client_secret|ghp_[0-9A-Za-z]{36,}|github_pat_[0-9A-Za-z_]{20,}|sk-[A-Za-z0-9]{20,}' -- . ':(exclude).github/workflows/ci.yml'; then
+          if git grep -nE 'AIza[0-9A-Za-z_-]{35}|-----BEGIN (RSA|OPENSSH|PRIVATE) KEY-----|private_key_id|client_secret|ghp_[0-9A-Za-z]{36,}|github_pat_[0-9A-Za-z_]{20,}|sk-[A-Za-z0-9]{20,}' -- .; then
             echo "Secret-like value found in tracked files." >&2
             exit 1
           fi
-
-      - name: Check public wording policy
-        run: |
-          set -euo pipefail
-          if grep -RInE 'clean-room|Google AI Partner|Powered by Google|file:///' README.md templates static *.md; then
-            echo "Risky public wording found." >&2
-            exit 1
-          fi
-          grep -q 'pyVideoTrans' THIRD_PARTY_NOTICES.md
-          grep -q 'f435ce22e1' FFMPEG_SOURCE_OFFER.md

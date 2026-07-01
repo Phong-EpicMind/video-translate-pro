@@ -19,10 +19,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
@@ -33,5 +33,4 @@ jobs:
           python -m pip install "bandit[toml]"
 
       - name: Run Bandit
-        run: |
-          bandit -r app.py desktop.py utils.py ptts_fallback.py scratch -ll
+        run: bandit -r translatedub -ll

@@ -22,13 +22,22 @@ Please include:
 
 ## Secret Handling
 
-TranslateDub AI stores Gemini API keys and Google Cloud Service Account JSON in macOS Keychain under the `com.phongho.translatedubai` service.
+TranslateDub AI resolves the Gemini API key and Google Cloud service-account JSON from
+environment variables first (`TRANSLATEDUB_GEMINI_KEY` / `GEMINI_API_KEY`, and
+`TRANSLATEDUB_GOOGLE_CLOUD_CREDENTIALS` / `GOOGLE_APPLICATION_CREDENTIALS`), then from
+`~/.translatedub/config.json`. This is the same model used by `gh`, `aws`, and `npm`.
 
-The local `~/.translatedub_ai/config.json` file is reserved for non-secret preferences and is written with restrictive file permissions. If an older config file contains secrets, the app migrates them to Keychain and rewrites the file without those secret fields.
+The config file is created with owner-only permissions (`0o600`), inside a `0o700`
+directory. On-disk secrets are plaintext by design: encrypting a local file without a
+user passphrase is obfuscation, not security. A future opt-in passphrase mode may add
+real encryption.
 
-The configuration API returns only non-secret settings plus boolean configured flags. It does not return stored Gemini API keys or Google Cloud Service Account JSON.
+The configuration API returns only non-secret settings plus boolean "configured" flags.
+It never returns the stored Gemini API key or Google Cloud service-account JSON. The
+local web server binds to `127.0.0.1` and rejects non-local requests.
 
-Never commit local `config.json`, Google Cloud service account JSON, API keys, temporary videos, generated audio, `.dmg`, `.app`, `dist/`, `build/`, `bin/`, or release artifacts.
+Never commit `config.json`, service-account JSON, API keys, temporary videos, or
+generated media. See `.gitignore`.
 
 ---
 
@@ -56,10 +65,18 @@ Nên cung cấp:
 
 ### Xử lý secret
 
-TranslateDub AI lưu Gemini API key và Google Cloud Service Account JSON trong macOS Keychain với service `com.phongho.translatedubai`.
+TranslateDub AI lấy Gemini API key và Google Cloud service-account JSON theo thứ tự:
+biến môi trường trước (`TRANSLATEDUB_GEMINI_KEY` / `GEMINI_API_KEY`, và
+`TRANSLATEDUB_GOOGLE_CLOUD_CREDENTIALS` / `GOOGLE_APPLICATION_CREDENTIALS`), sau đó là
+file `~/.translatedub/config.json`. Đây là cách `gh`, `aws`, `npm` vẫn làm.
 
-File `~/.translatedub_ai/config.json` chỉ dùng cho cấu hình không nhạy cảm và được ghi với quyền hạn chế. Nếu file config cũ có chứa secret, app sẽ migrate secret sang Keychain và ghi lại file mà không còn các trường secret.
+File config được tạo với quyền chỉ chủ máy đọc/ghi (`0o600`) trong thư mục `0o700`.
+Secret lưu dạng plaintext là chủ ý: mã hóa file cục bộ mà không có passphrase của người
+dùng chỉ là che mắt, không phải bảo mật thật. Sau này có thể thêm chế độ mã hóa bằng
+passphrase (tùy chọn).
 
-API cấu hình chỉ trả về thiết lập không nhạy cảm và có boolean cho biết đã cấu hình hay chưa. API này không trả Gemini API key hoặc Google Cloud Service Account JSON đã lưu.
+API cấu hình chỉ trả thiết lập không nhạy cảm và boolean "đã cấu hình", không bao giờ
+trả key/JSON đã lưu. Server web chỉ nghe ở `127.0.0.1` và từ chối request không phải cục bộ.
 
-Không commit `config.json`, Service Account JSON, API key, video tạm, audio đã tạo, `.dmg`, `.app`, `dist/`, `build/`, `bin/`, hoặc release artifacts.
+Không commit `config.json`, service-account JSON, API key, video tạm, hay media đã tạo.
+Xem `.gitignore`.
