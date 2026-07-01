@@ -34,7 +34,17 @@ uvx translatedub serve
 FFmpeg is resolved automatically: it uses a system `ffmpeg` if present, otherwise the
 bundled-per-platform binary from the `imageio-ffmpeg` dependency. Nothing extra to install.
 
-For premium Google Cloud voices, install the optional extra:
+For **free neural voices** (recommended — natural Vietnamese included, no API key needed),
+install the optional extra:
+
+```bash
+pip install "translatedub[free]"
+```
+
+Without it the app still works using gTTS. edge-tts (LGPLv3) is optional and invoked via
+its CLI; it is never bundled or modified.
+
+For premium Google Cloud voices, install the optional extra and add a key:
 
 ```bash
 pip install "translatedub[cloud]"
