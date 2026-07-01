@@ -1,12 +1,14 @@
 from translatedub.core import tts
+from translatedub.core.providers import tts as prov
 
 
 def _mock_gtts(monkeypatch, produced_ms):
     """Make gTTS synthesis a no-op file write and report a fixed duration."""
-    def fake_synth(text, lang, output_path):
+    def fake_synth(self, text, lang, output_path, voice_config, speaking_rate):
         with open(output_path, "wb") as f:
             f.write(b"fake")
-    monkeypatch.setattr(tts, "_synthesize_gtts", fake_synth)
+
+    monkeypatch.setattr(prov.GTTSProvider, "synthesize", fake_synth)
     monkeypatch.setattr(tts, "get_duration", lambda path: produced_ms / 1000)
 
 
@@ -48,8 +50,9 @@ def test_unknown_engine_returns_false(tmp_path):
 
 
 def test_gtts_error_is_caught(monkeypatch, tmp_path):
-    def boom(text, lang, output_path):
+    def boom(self, text, lang, output_path, voice_config, speaking_rate):
         raise RuntimeError("network down")
-    monkeypatch.setattr(tts, "_synthesize_gtts", boom)
+
+    monkeypatch.setattr(prov.GTTSProvider, "synthesize", boom)
     out = str(tmp_path / "a.mp3")
     assert tts.synthesize_segment("hi", "vi", "gtts", out) is False
