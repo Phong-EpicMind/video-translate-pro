@@ -51,6 +51,8 @@ def cmd_translate(args: argparse.Namespace) -> int:
             _log("google_cloud engine selected but no credentials stored.")
             return 2
         voice_config = {"credentials_json": creds, "voice_name": args.voice or ""}
+    elif args.voice:
+        voice_config = {"voice_name": args.voice}
 
     try:
         subtitles = pipeline.translate_video(
@@ -124,9 +126,10 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--src", "--from", default="auto", dest="src",
                    help="Source language code (default: auto).")
     t.add_argument("-o", "--output", help="Output video path.")
-    t.add_argument("--engine", choices=("gtts", "google_cloud"), default="gtts",
-                   help="TTS engine (default: gtts).")
-    t.add_argument("--voice", help="Google Cloud voice name, e.g. vi-VN-Neural2-A.")
+    t.add_argument("--engine", choices=("edge", "gtts", "google_cloud"), default="edge",
+                   help="TTS engine (default: edge — free neural voices).")
+    t.add_argument("--voice", help="Voice name (edge, e.g. vi-VN-HoaiMyNeural; "
+                                    "or Google Cloud, e.g. vi-VN-Neural2-A).")
     t.add_argument("--speed", type=float, default=1.0, help="Base speaking speed.")
     t.add_argument("--no-match-duration", action="store_true",
                    help="Do not speed speech to fit subtitle timing.")

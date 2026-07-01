@@ -64,3 +64,19 @@ def test_config_file_permissions(isolated_home):
 def test_get_secret_rejects_unknown_key(isolated_home):
     with pytest.raises(KeyError):
         config.get_secret("not_a_secret")
+
+
+def test_default_tts_engine_is_edge():
+    assert config.DEFAULT_SETTINGS["tts_engine"] == "edge"
+
+
+def test_public_config_lists_engines_without_secrets(isolated_home):
+    config.set_secret("gemini_key", "topsecret")
+    pub = config.public_config()
+    names = {e["name"] for e in pub["tts_engines"]}
+    assert {"gtts", "edge", "google_cloud"} <= names
+    assert "gemini_key" not in pub
+    assert "google_cloud_credentials" not in pub
+    assert "topsecret" not in json.dumps(pub)
+    for e in pub["tts_engines"]:
+        assert set(e) == {"name", "available", "premium", "reason"}
