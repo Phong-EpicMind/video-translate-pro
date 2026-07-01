@@ -27,9 +27,25 @@ def test_get_config_no_secret(client):
     assert "gemini_key" not in body
 
 
-def test_post_config_requires_gemini(client):
+def test_post_config_requires_gemini_when_no_free_engines(client, monkeypatch):
+    from translatedub.core.providers import asr, translate
+    monkeypatch.setattr(asr.REGISTRY["whisper"], "is_available", lambda cfg: (False, "x"))
+    monkeypatch.setattr(translate.REGISTRY["google_free"], "is_available",
+                        lambda cfg: (False, "x"))
     resp = client.post("/api/config", json={"target_lang": "en"})
     assert resp.status_code == 400
+
+
+def test_post_config_allows_keyless_when_free_available(client, monkeypatch):
+    from translatedub.core.providers import asr, translate
+    monkeypatch.setattr(asr.REGISTRY["whisper"], "is_available", lambda cfg: (True, ""))
+    monkeypatch.setattr(translate.REGISTRY["google_free"], "is_available",
+                        lambda cfg: (True, ""))
+    resp = client.post("/api/config", json={"target_lang": "en", "asr_engine": "whisper"})
+    assert resp.status_code == 200
+    body = resp.json()["config"]
+    assert body["has_gemini_key"] is False
+    assert body["asr_engine"] == "whisper"
 
 
 def test_post_config_saves_key_and_settings(client):
