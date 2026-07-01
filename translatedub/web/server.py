@@ -34,11 +34,11 @@ from ..core import (
     get_duration,
     mux_dubbed_audio,
     synthesize_segment,
-    transcribe_and_translate,
     write_srt,
 )
 from ..core.assemble import assemble_dub_track
 from ..filenames import sanitize_stem, unique_path
+from ..pipeline import transcribe_translate
 
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
 WEB_DIR = Path(__file__).resolve().parent
@@ -79,7 +79,14 @@ def create_app(local_only: bool = True) -> FastAPI:
         incoming = data.model_dump(exclude_unset=True)
         pub = config.update_settings(incoming)
         if not pub["has_gemini_key"]:
-            raise HTTPException(status_code=400, detail="Gemini API Key is required.")
+            asr_free = any(e["available"] for e in pub["asr_engines"] if e["name"] != "gemini")
+            tr_free = any(e["available"] for e in pub["translate_engines"] if e["name"] != "gemini")
+            if not (asr_free and tr_free):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cần một Gemini API Key, hoặc cài engine miễn phí: "
+                           "pip install \"translatedub[free]\".",
+                )
         return {"status": "success", "message": "Lưu cài đặt thành công!", "config": pub}
 
     @app.post("/api/upload")
@@ -127,6 +134,9 @@ class ConfigUpdate(BaseModel):
     google_cloud_credentials: Optional[str] = None
     src_lang: Optional[str] = None
     target_lang: Optional[str] = None
+    asr_engine: Optional[str] = None
+    translate_engine: Optional[str] = None
+    whisper_model: Optional[str] = None
     tts_engine: Optional[str] = None
     voice_name: Optional[str] = None
     base_speed: Optional[float] = None
@@ -223,9 +233,10 @@ async def _translate_stream(video_path: str, src_lang: str, target_lang: str, te
         yield _sse({"step": "error", "message": "Không tìm thấy file video nguồn."})
         return
     gemini_key = config.get_secret("gemini_key")
-    if not gemini_key:
-        yield _sse({"step": "error", "message": "Chưa nhập Gemini API Key."})
-        return
+    settings = config.load_config()
+    asr_engine = settings.get("asr_engine", "auto")
+    translate_engine = settings.get("translate_engine", "auto")
+    whisper_model = settings.get("whisper_model", "small")
 
     stem = os.path.splitext(os.path.basename(video_path))[0]
     audio_path = str(temp_dir / f"{stem}_{uuid.uuid4().hex[:8]}.mp3")
@@ -242,10 +253,14 @@ async def _translate_stream(video_path: str, src_lang: str, target_lang: str, te
     yield _sse({"step": "extract", "status": "done", "message": "Trích xuất âm thanh xong!"})
 
     yield _sse({"step": "transcribe", "status": "processing",
-                "message": "Đang gửi lên Gemini để nhận diện & dịch..."})
+                "message": "Đang nhận diện giọng nói & dịch..."})
     box: dict = {}
     async for event in _drain_thread(
-        lambda put: transcribe_and_translate(audio_path, gemini_key, src_lang, target_lang, put),
+        lambda put: transcribe_translate(
+            audio_path, src_lang, target_lang, gemini_key=gemini_key,
+            asr_engine=asr_engine, translate_engine=translate_engine,
+            whisper_model=whisper_model, log=put,
+        ),
         box, "transcribe",
     ):
         yield event

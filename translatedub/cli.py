@@ -36,10 +36,9 @@ def cmd_translate(args: argparse.Namespace) -> int:
         return 2
 
     gemini_key = config.get_secret("gemini_key")
-    if not gemini_key:
-        _log("No Gemini key. Set it with `translatedub config set-key` "
-             "or the GEMINI_API_KEY environment variable.")
-        return 2
+    # A key is no longer required: the auto stack falls back to local faster-whisper
+    # + deep-translator. If neither a key nor the [free] extra is available, the engine
+    # resolver raises a clear, actionable error (caught below).
 
     mode = "subtitles_only" if args.subtitles_only else "dubbed"
     output = args.output or _default_output(args.video, mode)
@@ -56,7 +55,9 @@ def cmd_translate(args: argparse.Namespace) -> int:
 
     try:
         subtitles = pipeline.translate_video(
-            args.video, args.src, args.to, gemini_key, log=_log
+            args.video, args.src, args.to, gemini_key, log=_log,
+            asr_engine=args.asr_engine, translate_engine=args.translate_engine,
+            whisper_model=args.whisper_model,
         )
         _log(f"Translated {len(subtitles)} subtitle lines.")
         pipeline.export_video(
@@ -126,6 +127,18 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--src", "--from", default="auto", dest="src",
                    help="Source language code (default: auto).")
     t.add_argument("-o", "--output", help="Output video path.")
+    t.add_argument("--asr-engine", choices=("auto", "whisper", "gemini"), default="auto",
+                   dest="asr_engine",
+                   help="Speech-to-text engine (default: auto — Gemini if a key is set, "
+                        "else local faster-whisper).")
+    t.add_argument("--translate-engine", choices=("auto", "google_free", "gemini"),
+                   default="auto", dest="translate_engine",
+                   help="Translation engine (default: auto — Gemini if a key is set, "
+                        "else free deep-translator).")
+    t.add_argument("--whisper-model",
+                   choices=("tiny", "base", "small", "medium", "large-v3"),
+                   default="small", dest="whisper_model",
+                   help="faster-whisper model size (default: small).")
     t.add_argument("--engine", choices=("edge", "gtts", "google_cloud"), default="edge",
                    help="TTS engine (default: edge — free neural voices).")
     t.add_argument("--voice", help="Voice name (edge, e.g. vi-VN-HoaiMyNeural; "

@@ -32,7 +32,7 @@
                 <div class="nav-section">
                     <h2 class="section-title"><i class="fa-solid fa-key"></i> Google Cấu Hình</h2>
                     <div class="form-group">
-                        <label for="geminiKey">Gemini API Key <span class="required">*</span></label>
+                        <label for="geminiKey">Gemini API Key <span class="help-text" style="font-weight:normal">(tùy chọn - để trống sẽ dùng engine miễn phí)</span></label>
                         <div class="input-password-wrapper">
                             <input type="password" id="geminiKey" placeholder="Nhập API Key từ AI Studio..." autocomplete="off">
                             <button type="button" id="toggleGeminiKey" class="btn-toggle-eye"><i class="fa-solid fa-eye"></i></button>
@@ -47,6 +47,35 @@
                             <button type="button" id="selectOutputDirBtn" class="btn-toggle-eye" style="right: 10px;" title="Chọn thư mục"><i class="fa-solid fa-folder-open"></i></button>
                         </div>
                         <span class="help-text">Dùng cho cả video thuyết minh, video phụ đề và batch.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="asrEngine">Động cơ nhận diện giọng nói (ASR)</label>
+                        <select id="asrEngine">
+                            <option value="auto" {% if config.asr_engine == 'auto' %}selected{% endif %}>Tự động (Gemini nếu có key, không thì Whisper miễn phí)</option>
+                            <option value="whisper" {% if config.asr_engine == 'whisper' %}selected{% endif %}>faster-whisper (Miễn Phí - Chạy trên máy)</option>
+                            <option value="gemini" {% if config.asr_engine == 'gemini' %}selected{% endif %}>Gemini (cần API Key)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="whisperModelGroup" style="display: none;">
+                        <label for="whisperModel">Cỡ mô hình Whisper</label>
+                        <select id="whisperModel">
+                            <option value="tiny" {% if config.whisper_model == 'tiny' %}selected{% endif %}>tiny (nhẹ nhất, nhanh)</option>
+                            <option value="base" {% if config.whisper_model == 'base' %}selected{% endif %}>base</option>
+                            <option value="small" {% if config.whisper_model == 'small' %}selected{% endif %}>small (khuyên dùng)</option>
+                            <option value="medium" {% if config.whisper_model == 'medium' %}selected{% endif %}>medium (chính xác hơn, chậm)</option>
+                            <option value="large-v3" {% if config.whisper_model == 'large-v3' %}selected{% endif %}>large-v3 (tốt nhất, nặng)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="translateEngine">Động cơ dịch</label>
+                        <select id="translateEngine">
+                            <option value="auto" {% if config.translate_engine == 'auto' %}selected{% endif %}>Tự động (Gemini nếu có key, không thì Google miễn phí)</option>
+                            <option value="google_free" {% if config.translate_engine == 'google_free' %}selected{% endif %}>deep-translator (Google - Miễn Phí)</option>
+                            <option value="gemini" {% if config.translate_engine == 'gemini' %}selected{% endif %}>Gemini (cần API Key)</option>
+                        </select>
                     </div>
 
                     <div class="form-group narration-setting">

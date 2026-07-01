@@ -141,6 +141,10 @@ const toggleGeminiKey = document.getElementById("toggleGeminiKey");
 const outputDir = document.getElementById("outputDir");
 const selectOutputDirBtn = document.getElementById("selectOutputDirBtn");
 const ttsEngine = document.getElementById("ttsEngine");
+const asrEngine = document.getElementById("asrEngine");
+const translateEngine = document.getElementById("translateEngine");
+const whisperModel = document.getElementById("whisperModel");
+const whisperModelGroup = document.getElementById("whisperModelGroup");
 const gcpCredentials = document.getElementById("gcpCredentials");
 const toggleGcpCredentials = document.getElementById("toggleGcpCredentials");
 const gcpCredentialsGroup = document.getElementById("gcpCredentialsGroup");
@@ -218,6 +222,11 @@ function setupEventListeners() {
     ttsEngine.addEventListener("change", () => {
         toggleTtsEngineGroups();
     });
+
+    // Show the Whisper model picker only when local ASR may be used.
+    if (asrEngine) {
+        asrEngine.addEventListener("change", toggleWhisperModelGroup);
+    }
 
     // Target Language change to update voices
     targetLang.addEventListener("change", () => {
@@ -453,9 +462,13 @@ async function loadConfig() {
         gcpCredentials.placeholder = hasSavedGoogleCloudCredentials ? "Google Cloud JSON đã lưu - dán JSON mới để thay thế" : "Dán Service Account JSON vào đây...";
         if (config.output_dir) outputDir.value = config.output_dir;
         if (config.tts_engine) ttsEngine.value = config.tts_engine;
+        if (asrEngine && config.asr_engine) asrEngine.value = config.asr_engine;
+        if (translateEngine && config.translate_engine) translateEngine.value = config.translate_engine;
+        if (whisperModel && config.whisper_model) whisperModel.value = config.whisper_model;
+        toggleWhisperModelGroup();
         if (config.src_lang) srcLang.value = config.src_lang;
         if (config.target_lang) targetLang.value = config.target_lang;
-        
+
         // Dynamically load voices list
         updateVoiceDropdown(targetLang.value);
         if (config.voice_name) voiceName.value = config.voice_name;
@@ -480,6 +493,9 @@ async function saveConfig() {
         gemini_key: geminiKey.value.trim(),
         google_cloud_credentials: gcpCredentials.value.trim(),
         tts_engine: ttsEngine.value,
+        asr_engine: asrEngine ? asrEngine.value : "auto",
+        translate_engine: translateEngine ? translateEngine.value : "auto",
+        whisper_model: whisperModel ? whisperModel.value : "small",
         src_lang: srcLang.value,
         target_lang: targetLang.value,
         voice_name: voiceName.value,
@@ -526,6 +542,9 @@ async function saveConfigSilently() {
         gemini_key: geminiKey.value.trim(),
         google_cloud_credentials: gcpCredentials.value.trim(),
         tts_engine: ttsEngine.value,
+        asr_engine: asrEngine ? asrEngine.value : "auto",
+        translate_engine: translateEngine ? translateEngine.value : "auto",
+        whisper_model: whisperModel ? whisperModel.value : "small",
         src_lang: srcLang.value,
         target_lang: targetLang.value,
         voice_name: voiceName.value,
@@ -549,6 +568,13 @@ async function saveConfigSilently() {
     } catch (e) {
         console.error("Silent config save error:", e);
     }
+}
+
+// Show the Whisper model picker only when local ASR may run (whisper or auto).
+function toggleWhisperModelGroup() {
+    if (!whisperModelGroup || !asrEngine) return;
+    const local = asrEngine.value === "whisper" || asrEngine.value === "auto";
+    whisperModelGroup.style.display = local ? "block" : "none";
 }
 
 // Show/hide Google Cloud TTS input groups
@@ -1114,6 +1140,9 @@ async function startExportPipeline(outputMode = selectedOutputMode) {
         dub_vol: parseFloat(dubVol.value),
         burn_subtitles: burnSubtitles.checked,
         tts_engine: ttsEngine.value,
+        asr_engine: asrEngine ? asrEngine.value : "auto",
+        translate_engine: translateEngine ? translateEngine.value : "auto",
+        whisper_model: whisperModel ? whisperModel.value : "small",
         voice_name: voiceName.value,
         base_speed: parseFloat(baseSpeed.value),
         match_duration: matchDuration.checked
