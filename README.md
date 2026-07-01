@@ -34,15 +34,17 @@ uvx translatedub serve
 FFmpeg is resolved automatically: it uses a system `ffmpeg` if present, otherwise the
 bundled-per-platform binary from the `imageio-ffmpeg` dependency. Nothing extra to install.
 
-For **free neural voices** (recommended — natural Vietnamese included, no API key needed),
-install the optional extra:
+For a **fully free, no-API-key pipeline** (recommended), install the optional extra:
 
 ```bash
 pip install "translatedub[free]"
 ```
 
-Without it the app still works using gTTS. edge-tts (LGPLv3) is optional and invoked via
-its CLI; it is never bundled or modified.
+This enables local speech recognition (faster-whisper), free translation
+(deep-translator), and free neural voices incl. natural Vietnamese (edge-tts) — so you can
+transcribe, translate, and dub **without any API key**. With a Gemini key set, the app
+prefers Gemini automatically for higher quality. edge-tts (LGPLv3) is optional and invoked
+via its CLI; nothing here is bundled or modified.
 
 For premium Google Cloud voices, install the optional extra and add a key:
 

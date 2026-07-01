@@ -51,13 +51,18 @@ Direct runtime dependencies declared in `pyproject.toml`:
 * **pydub** (MIT) — Copyright (c) 2011 James Robert
 * **imageio-ffmpeg** (BSD 2-Clause) — Copyright (c) 2018 imageio contributors
 
-Optional dependency (`translatedub[free]`):
+Optional dependencies (`translatedub[free]`):
 
 * **edge-tts** (LGPL-3.0-only) — Copyright (c) rany. Provides free neural voices
   (including Vietnamese) via Microsoft Edge's online TTS service. Used as an **optional**
   dependency and invoked **via its command-line interface as a subprocess**; its source is
   **not vendored, not modified, and not statically or dynamically linked into** TranslateDub
   AI. Project: <https://github.com/rany2/edge-tts>
+* **faster-whisper** (MIT) — Copyright (c) 2023 SYSTRAN. Local speech-to-text. Whisper
+  model weights are MIT (OpenAI), downloaded on first use. Project:
+  <https://github.com/SYSTRAN/faster-whisper>
+* **deep-translator** (Apache-2.0) — Copyright (c) Nidhal Baccouri. Free translation via
+  Google's public endpoint. Project: <https://github.com/nidhaloff/deep-translator>
 
 Optional dependency (`translatedub[cloud]`):
 
