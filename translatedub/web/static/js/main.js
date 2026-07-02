@@ -8,6 +8,19 @@ let selectedOutputMode = "dubbed";
 let batchSession = null;
 let hasSavedGeminiKey = false;
 let hasSavedGoogleCloudCredentials = false;
+// True when a keyless pipeline is possible (free ASR + translate engines installed).
+let freeStackAvailable = false;
+
+// A Gemini key is only mandatory when no free local stack is available.
+function needsGeminiKey() {
+    return !geminiKey.value.trim() && !hasSavedGeminiKey && !freeStackAvailable;
+}
+
+function missingEngineMessage() {
+    return freeStackAvailable
+        ? ""
+        : "Cần Gemini API Key, hoặc cài engine miễn phí: pip install \"translatedub[free]\"";
+}
 
 // Google Cloud TTS Premium Voices Database
 const PREMIUM_VOICES = {
@@ -202,18 +215,21 @@ function setupEventListeners() {
     // Select output directory click
     if (selectOutputDirBtn) {
         selectOutputDirBtn.addEventListener("click", async () => {
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.select_directory) {
-                try {
-                    const selected = await window.pywebview.api.select_directory();
-                    if (selected) {
-                        outputDir.value = selected;
-                        showToast("Đã chọn thư mục lưu: " + selected.split("/").pop());
-                    }
-                } catch (err) {
-                    console.error("Lỗi gọi API chọn thư mục:", err);
+            try {
+                const resp = await fetch("/api/pick-folder", { method: "POST" });
+                const data = await resp.json();
+                if (data.ok && data.path) {
+                    outputDir.value = data.path;
+                    saveConfigSilently();
+                    const parts = data.path.replace(/[\\/]+$/, "").split(/[\\/]/);
+                    showToast("Đã chọn thư mục lưu: " + (parts.pop() || data.path));
+                } else {
+                    // Cancelled, or no native dialog available on this OS.
+                    showToast("Bạn có thể dán đường dẫn trực tiếp vào ô bên cạnh.");
                 }
-            } else {
-                showToast("Vui lòng nhập/dán đường dẫn trực tiếp vào ô cấu hình.");
+            } catch (err) {
+                console.error("Lỗi mở hộp thoại chọn thư mục:", err);
+                showToast("Không mở được hộp thoại. Hãy dán đường dẫn trực tiếp.");
             }
         });
     }
@@ -453,7 +469,11 @@ async function loadConfig() {
     try {
         const response = await fetch("/api/config");
         const config = await response.json();
-        
+
+        const asrFree = (config.asr_engines || []).some(e => e.name !== "gemini" && e.available);
+        const trFree = (config.translate_engines || []).some(e => e.name !== "gemini" && e.available);
+        freeStackAvailable = asrFree && trFree;
+
         hasSavedGeminiKey = Boolean(config.has_gemini_key);
         hasSavedGoogleCloudCredentials = Boolean(config.has_google_cloud_credentials);
         geminiKey.value = "";
@@ -504,8 +524,8 @@ async function saveConfig() {
         output_dir: outputDir.value.trim()
     };
 
-    if (!data.gemini_key && !hasSavedGeminiKey) {
-        showToast("Vui lòng nhập Gemini API Key!");
+    if (needsGeminiKey()) {
+        showToast(missingEngineMessage());
         return;
     }
     if (data.tts_engine === "google_cloud" && !data.google_cloud_credentials && !hasSavedGoogleCloudCredentials) {
@@ -552,7 +572,7 @@ async function saveConfigSilently() {
         match_duration: matchDuration.checked,
         output_dir: outputDir.value.trim()
     };
-    if (!data.gemini_key && !hasSavedGeminiKey) return;
+    if (needsGeminiKey()) return;
     try {
         const response = await fetch("/api/config", {
             method: "POST",
@@ -651,8 +671,8 @@ async function uploadVideoFile(file) {
 
 async function handleFileUpload(file) {
     if (!file) return;
-    if (!geminiKey.value.trim() && !hasSavedGeminiKey) {
-        showToast("Vui lòng lưu Gemini API Key ở thanh bên trước!");
+    if (needsGeminiKey()) {
+        showToast(missingEngineMessage());
         return;
     }
 
@@ -719,8 +739,8 @@ function resetPipelineFlowchart() {
 
 // Start Speech-to-Text & Translation (SSE)
 function startTranslationPipeline(videoPath) {
-    if (!geminiKey.value.trim() && !hasSavedGeminiKey) {
-        showToast("Vui lòng nhập Gemini API Key ở thanh bên!");
+    if (needsGeminiKey()) {
+        showToast(missingEngineMessage());
         switchState(dropzoneState);
         return;
     }
@@ -835,8 +855,8 @@ function translateVideoToSubtitles(videoPath) {
 }
 
 async function startBatchPipeline(files) {
-    if (!geminiKey.value.trim() && !hasSavedGeminiKey) {
-        showToast("Vui lòng lưu Gemini API Key ở thanh bên trước!");
+    if (needsGeminiKey()) {
+        showToast(missingEngineMessage());
         return;
     }
 

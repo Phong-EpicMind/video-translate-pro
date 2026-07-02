@@ -62,3 +62,21 @@ def test_post_config_saves_key_and_settings(client):
 def test_reveal_missing_file(client):
     resp = client.post("/api/reveal", json={"path": "/no/such/file.mp4"})
     assert resp.json()["ok"] is False
+
+
+def test_pick_folder_returns_selected_path(client, monkeypatch):
+    import translatedub.web.server as server
+    monkeypatch.setattr(server, "_pick_folder_native", lambda: "/Users/x/Movies")
+    resp = client.post("/api/pick-folder")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True and body["path"] == "/Users/x/Movies"
+
+
+def test_pick_folder_cancelled_returns_empty(client, monkeypatch):
+    import translatedub.web.server as server
+    monkeypatch.setattr(server, "_pick_folder_native", lambda: None)
+    resp = client.post("/api/pick-folder")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False and body["path"] == ""

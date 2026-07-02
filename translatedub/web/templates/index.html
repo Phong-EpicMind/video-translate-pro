@@ -205,7 +205,7 @@
                 </div>
                 <div class="app-status">
                     <button id="headerStartOverBtn" class="btn btn-secondary btn-sm" style="margin-right: 12px; display: none; padding: 6px 12px; font-size: 13px; border-radius: 6px;"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>
-                    <span class="status-badge connected"><span class="dot"></span> Chạy cục bộ (macOS)</span>
+                    <span class="status-badge connected"><span class="dot"></span> Chạy cục bộ (127.0.0.1)</span>
                 </div>
             </header>
 
@@ -218,7 +218,7 @@
                         <p>Chọn 1 video để biên tập phụ đề, hoặc chọn nhiều video để duyệt từng video trong batch.</p>
                         <div class="divider"><span>hoặc</span></div>
                         <input type="file" id="videoFileInput" accept="video/*" multiple style="display: none;">
-                        <button type="button" class="btn btn-primary" onclick="document.getElementById('videoFileInput').click()"><i class="fa-solid fa-file-video"></i> Chọn video từ máy Mac</button>
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('videoFileInput').click()"><i class="fa-solid fa-file-video"></i> Chọn video từ máy tính</button>
                         <div id="batchQueuePanel" class="batch-queue-panel" style="display: none;">
                             <div class="batch-queue-header">
                                 <span><i class="fa-solid fa-list-check"></i> Batch queue</span>
@@ -228,9 +228,9 @@
                         </div>
                         
                         <div class="local-path-wrapper">
-                            <div class="divider"><span>hoặc nhập đường dẫn trực tiếp trên Mac</span></div>
+                            <div class="divider"><span>hoặc nhập đường dẫn trực tiếp</span></div>
                             <div class="local-path-input">
-                                <input type="text" id="localVideoPath" placeholder="Ví dụ: /Users/username/Movies/sample.mp4">
+                                <input type="text" id="localVideoPath" placeholder="Ví dụ: /Users/ban/Movies/video.mp4 hoặc C:\Videos\video.mp4">
                                 <button type="button" id="localPathSubmitBtn" class="btn btn-secondary">Tiếp tục</button>
                             </div>
                         </div>
@@ -355,8 +355,8 @@
 
                         <div class="result-info">
                             <div class="info-row">
-                                <span class="label">Đường dẫn file trên máy Mac:</span>
-                                <span class="value select-all" id="finalVideoPath">/Users/username/Movies/...</span>
+                                <span class="label">Đường dẫn file:</span>
+                                <span class="value select-all" id="finalVideoPath">...</span>
                             </div>
                         </div>
 
