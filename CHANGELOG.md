@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-02
+
+### Fixed
+- **macOS folder picker now reliably opens in front.** `tell me to activate` was
+  not enough for a dialog spawned by a background process (verified via System
+  Events); the dialog is now hosted by Finder, which can truly activate. If
+  Finder automation permission is denied, falls back to a plain dialog; a user
+  cancel is respected and never reopens the dialog.
+
 ## [0.2.1] - 2026-07-02
 
 ### Fixed
@@ -63,7 +72,8 @@ First release as a cross-platform pip package (`translatedub`).
 - Initial public prototype: macOS desktop app for video translation, subtitle
   editing, and AI dubbing with Gemini + gTTS / Google Cloud TTS.
 
-[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.0
 [0.1.2]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.1.2

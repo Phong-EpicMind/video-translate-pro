@@ -208,12 +208,22 @@ def _pick_folder_native() -> "Optional[str]":
     """
     try:
         if sys.platform == "darwin":
-            script = 'POSIX path of (choose folder with prompt "Chọn thư mục lưu video")'
-            # 'activate' first: a dialog opened by a background process does not
-            # come to the front on its own, which reads as "nothing happened".
-            result = subprocess.run(
-                ["osascript", "-e", "tell me to activate", "-e", script],
-                capture_output=True, text=True)
+            choose = 'POSIX path of (choose folder with prompt "Chọn thư mục lưu video")'
+            # Host the dialog in Finder: a dialog opened by a background process
+            # does not come to the front on its own ('tell me to activate' is not
+            # enough — verified with System Events), which reads as "nothing
+            # happened" and invites a second click. Finder CAN activate.
+            finder_script = f'tell application "Finder"\nactivate\n{choose}\nend tell'
+            result = subprocess.run(["osascript", "-e", finder_script],
+                                    capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout.strip() or None
+            if "-128" in (result.stderr or ""):
+                return None  # user cancelled — do not open another dialog
+            # Automation permission denied (or Finder unavailable): fall back to
+            # a plain dialog. It may open behind other windows but still works.
+            result = subprocess.run(["osascript", "-e", choose],
+                                    capture_output=True, text=True)
             if result.returncode == 0:
                 return result.stdout.strip() or None
         elif os.name == "nt":
