@@ -155,5 +155,23 @@ translatedub serve --no-browser # manual smoke test
 - Design specs live in `docs/superpowers/specs/`; implementation plans in
   `docs/superpowers/plans/`.
 - **Current state:** Phases A + B shipped on `main` (PRs #11, #12); UX fixes in #13
-  (keyless UI gating, OS-neutral copy, native folder picker). Next: Phase C (premium
-  OpenAI/ElevenLabs).
+  (keyless UI gating, OS-neutral copy, native folder picker); OSS polish + first PyPI
+  publish (v0.2.0, automated releases) in #14. Next: Phase C (premium OpenAI/ElevenLabs).
+
+## Backlog & decisions (maintainer-approved order)
+
+Benchmarked 2026-07-02 against pyVideoTrans (~18k stars), VideoLingo (~17.6k), and
+Buzz (~20k). Our compliance/security posture already exceeds all three (they lack
+SECURITY.md; VideoLingo has no CI). The gaps are convenience/visibility, queued as:
+
+1. **README demo media** (screenshot + GIF of the web UI) — after the maintainer
+   finishes manual testing of the zero-key pipeline. Highest impact, do first.
+2. **GPU option for faster-whisper** (expose `device`/`compute_type`) — small PR, later.
+3. **Dockerfile** — small PR, later.
+4. Standalone double-click installers (.exe/.dmg-style) — deferred; `uvx translatedub
+   serve` is already a one-liner and installers add maintenance burden.
+
+**Rejected — do not implement (do not accept PRs for):**
+- **YouTube/URL video download (yt-dlp or similar).** Maintainer decision: downloading
+  from YouTube carries copyright/ToS risk this project will not take on. Users bring
+  their own local files.
