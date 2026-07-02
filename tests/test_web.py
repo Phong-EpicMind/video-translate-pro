@@ -80,3 +80,24 @@ def test_pick_folder_cancelled_returns_empty(client, monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is False and body["path"] == ""
+
+
+def test_pick_folder_rejects_concurrent_dialog(client, monkeypatch):
+    """Only one native dialog may be open at a time: a second request while the
+    first dialog is still open must return busy, not queue a second dialog."""
+    import translatedub.web.server as server
+    calls = []
+    monkeypatch.setattr(server, "_pick_folder_native",
+                        lambda: calls.append(1) or "/somewhere")
+    assert server._folder_dialog_lock.acquire(blocking=False)  # dialog "open"
+    try:
+        resp = client.post("/api/pick-folder")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is False and body.get("busy") is True
+        assert calls == []  # no second dialog was opened
+    finally:
+        server._folder_dialog_lock.release()
+    # after the first dialog closes, picking works again
+    resp = client.post("/api/pick-folder")
+    assert resp.json()["ok"] is True and calls == [1]

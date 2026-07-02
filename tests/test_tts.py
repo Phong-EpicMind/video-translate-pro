@@ -1,5 +1,13 @@
+import pytest
+
 from translatedub.core import tts
 from translatedub.core.providers import tts as prov
+
+
+@pytest.fixture(autouse=True)
+def no_retry_sleep(monkeypatch):
+    """Retry backoff must never make the unit suite actually sleep."""
+    monkeypatch.setattr(tts, "_sleep", lambda s: None)
 
 
 def _mock_gtts(monkeypatch, produced_ms):
@@ -58,26 +66,124 @@ def test_gtts_error_is_caught(monkeypatch, tmp_path):
     assert tts.synthesize_segment("hi", "vi", "gtts", out) is False
 
 
-def test_edge_runtime_failure_falls_back_to_gtts(monkeypatch, tmp_path):
-    """A free engine failing mid-synthesis degrades to gTTS instead of hard-failing."""
-    monkeypatch.setattr(prov, "_edge_cli", lambda: "/usr/bin/edge-tts")  # edge resolves
+def test_transient_edge_failure_is_retried(monkeypatch, tmp_path):
+    """Transient failures (edge-tts rate limiting) are retried with backoff."""
+    monkeypatch.setattr(prov, "_edge_cli", lambda: "/usr/bin/edge-tts")
+    sleeps = []
+    monkeypatch.setattr(tts, "_sleep", sleeps.append)
+    attempts = {"n": 0}
 
-    def edge_boom(self, text, lang, output_path, voice_config, speaking_rate):
-        raise RuntimeError("edge-tts failed: 403")
-
-    def gtts_ok(self, text, lang, output_path, voice_config, speaking_rate):
+    def flaky_edge(self, text, lang, output_path, voice_config, speaking_rate):
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            raise RuntimeError("edge-tts failed: NoAudioReceived")
         with open(output_path, "wb") as f:
             f.write(b"fake")
 
-    monkeypatch.setattr(prov.EdgeTTSProvider, "synthesize", edge_boom)
-    monkeypatch.setattr(prov.GTTSProvider, "synthesize", gtts_ok)
+    monkeypatch.setattr(prov.EdgeTTSProvider, "synthesize", flaky_edge)
     monkeypatch.setattr(tts, "get_duration", lambda path: 1.0)
-    logs = []
     out = str(tmp_path / "a.mp3")
-    ok = tts.synthesize_segment("hi", "vi", "edge", out, target_duration_ms=1000,
-                                log=logs.append)
+    ok = tts.synthesize_segment("hi", "vi", "edge", out, target_duration_ms=1000)
     assert ok is True
-    assert any("falling back to gtts" in m for m in logs)
+    assert attempts["n"] == 3
+    assert len(sleeps) == 2  # waited before each retry
+
+
+def test_edge_persistent_failure_does_NOT_switch_voice_mid_segment(monkeypatch, tmp_path):
+    """No more silent per-segment gTTS fallback: it caused mixed voices in one video.
+    A persistent edge failure fails the segment; voice consistency is handled at
+    the job level (synthesize_segments)."""
+    monkeypatch.setattr(prov, "_edge_cli", lambda: "/usr/bin/edge-tts")
+    monkeypatch.setattr(tts, "_sleep", lambda s: None)
+
+    def edge_boom(self, text, lang, output_path, voice_config, speaking_rate):
+        raise RuntimeError("edge-tts failed: NoAudioReceived")
+
+    gtts_calls = []
+
+    def gtts_spy(self, text, lang, output_path, voice_config, speaking_rate):
+        gtts_calls.append(text)
+
+    monkeypatch.setattr(prov.EdgeTTSProvider, "synthesize", edge_boom)
+    monkeypatch.setattr(prov.GTTSProvider, "synthesize", gtts_spy)
+    out = str(tmp_path / "a.mp3")
+    ok = tts.synthesize_segment("hi", "vi", "edge", out)
+    assert ok is False
+    assert gtts_calls == []  # the segment must NOT come out in a different voice
+
+
+def _subs(n):
+    from translatedub.core.subtitles import Subtitle
+    return [Subtitle(index=i, start_ms=i * 1000, end_ms=i * 1000 + 900,
+                     original_text=f"line {i}", translated_text=f"dòng {i}")
+            for i in range(1, n + 1)]
+
+
+def test_synthesize_segments_switches_whole_job_for_voice_consistency(monkeypatch, tmp_path):
+    """If edge dies for good on one line, the ENTIRE video is re-dubbed with gTTS
+    so the output never mixes two voices."""
+    monkeypatch.setattr(prov, "_edge_cli", lambda: "/usr/bin/edge-tts")
+    monkeypatch.setattr(tts, "_sleep", lambda s: None)
+    monkeypatch.setattr(tts, "get_duration", lambda path: 0.9)
+    edge_calls, gtts_calls = [], []
+
+    def edge_synth(self, text, lang, output_path, voice_config, speaking_rate):
+        if text == "dòng 2":
+            raise RuntimeError("edge-tts failed: NoAudioReceived")
+        edge_calls.append(text)
+        with open(output_path, "wb") as f:
+            f.write(b"edge")
+
+    def gtts_synth(self, text, lang, output_path, voice_config, speaking_rate):
+        gtts_calls.append(text)
+        with open(output_path, "wb") as f:
+            f.write(b"gtts")
+
+    monkeypatch.setattr(prov.EdgeTTSProvider, "synthesize", edge_synth)
+    monkeypatch.setattr(prov.GTTSProvider, "synthesize", gtts_synth)
+    subs = _subs(3)
+    logs = []
+    used = tts.synthesize_segments(subs, "vi", "edge", str(tmp_path), log=logs.append)
+    assert used == "gtts"
+    # every line was re-synthesised with gTTS — one single voice
+    assert gtts_calls == ["dòng 1", "dòng 2", "dòng 3"]
+    for s in subs:
+        with open(s.audio_path, "rb") as f:
+            assert f.read() == b"gtts"
+    assert any("voice consistency" in m for m in logs)
+
+
+def test_synthesize_segments_keeps_edge_when_all_lines_succeed(monkeypatch, tmp_path):
+    monkeypatch.setattr(prov, "_edge_cli", lambda: "/usr/bin/edge-tts")
+    monkeypatch.setattr(tts, "get_duration", lambda path: 0.9)
+    gtts_calls = []
+
+    def edge_synth(self, text, lang, output_path, voice_config, speaking_rate):
+        with open(output_path, "wb") as f:
+            f.write(b"edge")
+
+    monkeypatch.setattr(prov.EdgeTTSProvider, "synthesize", edge_synth)
+    monkeypatch.setattr(
+        prov.GTTSProvider, "synthesize",
+        lambda self, *a, **k: gtts_calls.append(a),
+    )
+    subs = _subs(2)
+    used = tts.synthesize_segments(subs, "vi", "edge", str(tmp_path))
+    assert used == "edge"
+    assert gtts_calls == []
+    assert all(getattr(s, "audio_path", None) for s in subs)
+
+
+def test_synthesize_segments_raises_when_gtts_also_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(tts, "_sleep", lambda s: None)
+
+    def boom(self, text, lang, output_path, voice_config, speaking_rate):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(prov.GTTSProvider, "synthesize", boom)
+    import pytest
+    with pytest.raises(RuntimeError):
+        tts.synthesize_segments(_subs(1), "vi", "gtts", str(tmp_path))
 
 
 def test_premium_runtime_failure_does_not_fall_back(monkeypatch, tmp_path):

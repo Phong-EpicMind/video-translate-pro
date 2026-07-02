@@ -33,7 +33,7 @@ from ..core import (
     extract_audio,
     get_duration,
     mux_dubbed_audio,
-    synthesize_segment,
+    synthesize_segments,
     write_srt,
 )
 from ..core.assemble import assemble_dub_track
@@ -41,6 +41,11 @@ from ..filenames import sanitize_stem, unique_path
 from ..pipeline import transcribe_translate
 
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+# Only one native folder dialog may be open at a time: a dialog opened by a
+# background process does not steal focus, so users used to click again and
+# get a second dialog queued behind the first.
+_folder_dialog_lock = threading.Lock()
 WEB_DIR = Path(__file__).resolve().parent
 STATIC_DIR = WEB_DIR / "static"
 TEMPLATES_DIR = WEB_DIR / "templates"
@@ -115,7 +120,12 @@ def create_app(local_only: bool = True) -> FastAPI:
 
     @app.post("/api/pick-folder")
     async def pick_folder():
-        path = _pick_folder_native()
+        if not _folder_dialog_lock.acquire(blocking=False):
+            return {"ok": False, "path": "", "busy": True}
+        try:
+            path = await asyncio.to_thread(_pick_folder_native)
+        finally:
+            _folder_dialog_lock.release()
         return {"ok": bool(path), "path": path or ""}
 
     @app.get("/api/translate/progress")
@@ -199,8 +209,11 @@ def _pick_folder_native() -> "Optional[str]":
     try:
         if sys.platform == "darwin":
             script = 'POSIX path of (choose folder with prompt "Chọn thư mục lưu video")'
-            result = subprocess.run(["osascript", "-e", script],
-                                    capture_output=True, text=True)
+            # 'activate' first: a dialog opened by a background process does not
+            # come to the front on its own, which reads as "nothing happened".
+            result = subprocess.run(
+                ["osascript", "-e", "tell me to activate", "-e", script],
+                capture_output=True, text=True)
             if result.returncode == 0:
                 return result.stdout.strip() or None
         elif os.name == "nt":
@@ -383,19 +396,26 @@ async def _dub_stream(req: DubbingRequest, temp_dir: Path):
     try:
         yield _sse({"step": "tts", "status": "processing",
                     "message": f"Tạo thuyết minh cho {len(subtitles)} dòng ({req.tts_engine})..."})
-        for i, sub in enumerate(subtitles, start=1):
-            clip = str(chunks_dir / f"segment_{sub.index}.mp3")
-            yield _sse({"step": "tts", "status": "processing",
-                        "message": f"Dòng {i}/{len(subtitles)}: '{sub.translated_text[:20]}...'"})
-            ok = await asyncio.to_thread(
-                synthesize_segment, sub.translated_text, target_lang, req.tts_engine, clip,
-                voice_config, sub.duration_ms, req.base_speed or 1.0,
-                req.match_duration if req.match_duration is not None else True,
+        tts_box: dict = {}
+
+        def _tts_work(put):
+            def _progress(i, n, sub):
+                put(f"Dòng {i}/{n}: '{sub.translated_text[:20]}...'")
+
+            return synthesize_segments(
+                subtitles, lang=target_lang, engine=req.tts_engine,
+                chunks_dir=str(chunks_dir), voice_config=voice_config,
+                base_speed=req.base_speed or 1.0,
+                match_duration=req.match_duration if req.match_duration is not None else True,
+                log=put, progress=_progress,
             )
-            if not ok:
-                yield _sse({"step": "error", "message": f"Lỗi tạo giọng đọc dòng {sub.index}."})
-                return
-            sub.audio_path = clip
+
+        async for event in _drain_thread(_tts_work, tts_box, "tts"):
+            yield event
+        if tts_box.get("error") or not tts_box.get("result"):
+            yield _sse({"step": "error",
+                        "message": f"Lỗi tạo giọng đọc: {tts_box.get('error', 'không rõ')}"})
+            return
 
         yield _sse({"step": "tts", "status": "processing", "message": "Đồng bộ & ghép track..."})
         total_ms = int(get_duration(video_path) * 1000)

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-02
+
+### Fixed
+- **Dubbed output could mix two voices.** edge-tts is rate-limited by Microsoft and
+  fails transiently (`NoAudioReceived`); failed lines silently fell back to gTTS,
+  producing a video that alternated between two voices. Synthesis now retries with
+  backoff (rescues the vast majority of lines), and if a free engine still fails,
+  the entire video is re-synthesised with one engine — output never mixes voices.
+- **Folder picker could open twice.** The native dialog is now brought to the front
+  (macOS), only one dialog can be open at a time (server-side lock + client-side
+  button guard), and the dialog no longer blocks the web server's event loop.
+
 ## [0.2.0] - 2026-07-02
 
 First release as a cross-platform pip package (`translatedub`).
@@ -51,7 +63,8 @@ First release as a cross-platform pip package (`translatedub`).
 - Initial public prototype: macOS desktop app for video translation, subtitle
   editing, and AI dubbing with Gemini + gTTS / Google Cloud TTS.
 
-[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.0
 [0.1.2]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.1.2
 [0.1.0]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.1.0
