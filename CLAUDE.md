@@ -21,8 +21,15 @@ general workflow of pyVideoTrans — no pyVideoTrans code/assets/binaries are us
   ever receives user media or keys. The web server binds to `127.0.0.1` only.
 - **Cross-platform.** No macOS-only code. No hardcoded `/opt/homebrew` paths, no
   `open -R`, no `Security`/Keychain. Guard OS-specific bits (`sys.platform` / `os.name`).
+  This includes **UI copy**: never write "máy Mac", "macOS", or `/Users/username` examples
+  in templates/JS — keep wording OS-neutral. Native OS actions (reveal-in-file-manager,
+  folder picker) branch per OS in `web/server.py`.
 - **Low barrier to entry.** A new user should be able to run the tool with **zero API keys**
-  (see engine roadmap). Keys unlock higher quality, they are never required to start.
+  (see engine roadmap). Keys unlock higher quality, they are never required to start. The
+  **web UI must reflect this**: it reads engine availability from `/api/config`
+  (`asr_engines`/`translate_engines`/`tts_engines`) and only demands a Gemini key when
+  neither a key nor a free local stack is available (`needsGeminiKey()` in `main.js`). The
+  backend `/api/config` POST mirrors that rule.
 
 ## Architecture
 
@@ -45,7 +52,8 @@ translatedub/
       tts.py        edge / gTTS / Google Cloud providers, registry, resolution
     assemble.py     overlay per-segment TTS clips into one dubbed track
   web/
-    server.py       FastAPI app; same SSE/JSON contract the frontend expects
+    server.py       FastAPI app; SSE/JSON contract + cross-platform native helpers
+                    (_reveal_in_file_manager, _pick_folder_native / POST /api/pick-folder)
     templates/, static/   the single-page UI (moved from repo root)
 ```
 
@@ -139,5 +147,12 @@ translatedub serve --no-browser # manual smoke test
 - Match the surrounding code style; keep modules small and single-purpose.
 - Never commit secrets, generated media, `config.json`, or build artifacts (see `.gitignore`).
 - Keep the web SSE/JSON event contract stable so `static/js/main.js` keeps working, or
-  update both sides together.
-- Design specs live in `docs/superpowers/specs/`.
+  update both sides together. When adding an engine setting, wire it through **all** of:
+  `config.DEFAULT_SETTINGS` → `public_config()` → `ConfigUpdate` model → CLI flag → the UI
+  select + its save payloads. Missing one leaves the UI out of sync with the backend.
+- Design specs live in `docs/superpowers/specs/`; implementation plans in
+  `docs/superpowers/plans/`.
+- **Current state:** Phases A + B shipped on `main` (PRs #11, #12); UX fixes in #13
+  (keyless UI gating, OS-neutral copy, native folder picker). Next: Phase C (premium
+  OpenAI/ElevenLabs). Open for the maintainer: rotate the previously-leaked Gemini + GCP
+  keys.
