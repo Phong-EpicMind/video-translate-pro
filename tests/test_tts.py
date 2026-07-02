@@ -200,3 +200,31 @@ def test_premium_runtime_failure_does_not_fall_back(monkeypatch, tmp_path):
         import pytest
         pytest.skip("google-cloud-texttospeech not installed")
     assert tts.synthesize_segment("hi", "vi", "google_cloud", out, voice_config=vc) is False
+
+
+def test_synthesize_segments_targets_gap_to_next_line(monkeypatch, tmp_path):
+    """Duration matching must aim at the gap to the NEXT line, not the subtitle
+    window: clips within the gap need no speed-up, and clips capped at max speed
+    must not spill into the next line (that caused overlapping voices)."""
+    monkeypatch.setattr(prov, "_edge_cli", lambda: "/usr/bin/edge-tts")
+    targets = []
+
+    def spy_segment(text, lang, engine, output_path, voice_config=None,
+                    target_duration_ms=None, base_speed=1.0, match_duration=True,
+                    log=None):
+        targets.append(target_duration_ms)
+        with open(output_path, "wb") as f:
+            f.write(b"x")
+        return True
+
+    monkeypatch.setattr(tts, "synthesize_segment", spy_segment)
+    from translatedub.core.subtitles import Subtitle
+    subs = [
+        Subtitle(index=1, start_ms=0, end_ms=900, original_text="a", translated_text="a"),
+        Subtitle(index=2, start_ms=2000, end_ms=2500, original_text="b", translated_text="b"),
+        Subtitle(index=3, start_ms=4000, end_ms=4800, original_text="c", translated_text="c"),
+    ]
+    tts.synthesize_segments(subs, "vi", "edge", str(tmp_path))
+    # line 1 may run until line 2 starts (2000ms), line 2 until 4000-2000=2000ms;
+    # the last line keeps its own subtitle window.
+    assert targets == [2000, 2000, 800]

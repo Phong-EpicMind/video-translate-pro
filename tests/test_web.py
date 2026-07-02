@@ -101,3 +101,14 @@ def test_pick_folder_rejects_concurrent_dialog(client, monkeypatch):
     # after the first dialog closes, picking works again
     resp = client.post("/api/pick-folder")
     assert resp.json()["ok"] is True and calls == [1]
+
+
+def test_voice_config_includes_voice_for_free_engines():
+    """The web UI's voice choice must reach every engine (NamMinh bug: edge
+    silently fell back to the default voice because voice_name was only wired
+    for google_cloud)."""
+    from translatedub.web.server import DubbingRequest, _voice_config_for
+    req = DubbingRequest(video_path="v.mp4", subtitles=[], original_vol=0.1,
+                         dub_vol=1.0, burn_subtitles=False, tts_engine="edge",
+                         voice_name="vi-VN-NamMinhNeural")
+    assert _voice_config_for(req)["voice_name"] == "vi-VN-NamMinhNeural"

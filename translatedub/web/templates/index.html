@@ -23,14 +23,14 @@
                 <div class="logo-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
                 <div class="logo-text">
                     <h1>Translate Pro</h1>
-                    <span>Integrated with Google AI APIs</span>
+                    <span>Dịch & thuyết minh video bằng AI</span>
                 </div>
             </div>
 
             <nav class="sidebar-nav">
                 <!-- Section: API Config -->
                 <div class="nav-section">
-                    <h2 class="section-title"><i class="fa-solid fa-key"></i> Google Cấu Hình</h2>
+                    <h2 class="section-title"><i class="fa-solid fa-key"></i> Cấu Hình</h2>
                     <div class="form-group">
                         <label for="geminiKey">Gemini API Key <span class="help-text" style="font-weight:normal">(tùy chọn - để trống sẽ dùng engine miễn phí)</span></label>
                         <div class="input-password-wrapper">
@@ -43,7 +43,7 @@
                     <div class="form-group">
                         <label for="outputDir">Thư mục lưu video xuất ra</label>
                         <div class="input-password-wrapper">
-                            <input type="text" id="outputDir" placeholder="Đường dẫn thư mục, ví dụ: /Users/.../Desktop" value="{{ config.output_dir or '' }}">
+                            <input type="text" id="outputDir" placeholder="Đường dẫn thư mục lưu video" value="{{ config.output_dir or '' }}">
                             <button type="button" id="selectOutputDirBtn" class="btn-toggle-eye" style="right: 10px;" title="Chọn thư mục"><i class="fa-solid fa-folder-open"></i></button>
                         </div>
                         <span class="help-text">Dùng cho cả video thuyết minh, video phụ đề và batch.</span>
@@ -201,7 +201,7 @@
             <header class="app-header">
                 <div class="header-title">
                     <h2>Dịch thuật & Thuyết minh Video</h2>
-                    <p>Đơn giản hóa quy trình sản xuất video đa ngôn ngữ với trí tuệ nhân tạo của Google.</p>
+                    <p>Dịch, phụ đề và thuyết minh video đa ngôn ngữ — chạy ngay trên máy của bạn, tự chọn engine AI.</p>
                 </div>
                 <div class="app-status">
                     <button id="headerStartOverBtn" class="btn btn-secondary btn-sm" style="margin-right: 12px; display: none; padding: 6px 12px; font-size: 13px; border-radius: 6px;"><i class="fa-solid fa-rotate-left"></i> Dịch video mới</button>

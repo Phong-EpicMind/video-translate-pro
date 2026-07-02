@@ -56,3 +56,15 @@ def test_has_no_audio_stream(monkeypatch):
         stderr = "Stream #0:0: Video: h264\n"
     monkeypatch.setattr(media, "_run", lambda cmd, log=None: R())
     assert media.has_audio_stream("x.mp4") is False
+
+
+def test_clip_limit_prevents_overlap():
+    """A synthesized clip may never run past the start of the next line."""
+    from translatedub.core.assemble import _clip_limit_ms
+    from translatedub.core.subtitles import Subtitle
+    subs = [
+        Subtitle(index=1, start_ms=0, end_ms=900, original_text="a", translated_text="a"),
+        Subtitle(index=2, start_ms=2000, end_ms=2500, original_text="b", translated_text="b"),
+    ]
+    assert _clip_limit_ms(subs, 0, total_ms=10000) == 2000   # until next line starts
+    assert _clip_limit_ms(subs, 1, total_ms=10000) == 8000   # last line: until video ends

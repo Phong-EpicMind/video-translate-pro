@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-07-02
+
+### Fixed
+- **The selected voice now reaches every engine.** The web UI only wired the
+  voice choice to Google Cloud, so edge-tts silently ignored it (picking NamMinh
+  still produced the default HoaiMy voice — or gTTS after a fallback).
+- **Consecutive lines can no longer talk over each other.** Duration matching now
+  aims at the gap until the next line starts (less speed-up, more natural), and
+  the assembler trims any clip that would still spill into the next line with a
+  short fade.
+
+### Changed
+- UI copy no longer brands the app as Google-only ("Integrated with Google AI
+  APIs" etc.) — the engine lineup is pluggable by design.
+
 ## [0.2.2] - 2026-07-02
 
 ### Fixed
@@ -72,7 +87,8 @@ First release as a cross-platform pip package (`translatedub`).
 - Initial public prototype: macOS desktop app for video translation, subtitle
   editing, and AI dubbing with Gemini + gTTS / Google Cloud TTS.
 
-[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.3
 [0.2.2]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.0

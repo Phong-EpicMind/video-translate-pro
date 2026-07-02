@@ -254,6 +254,16 @@ def _pick_folder_native() -> "Optional[str]":
     return None
 
 
+def _voice_config_for(req: "DubbingRequest") -> dict:
+    """Voice settings for the chosen engine. The selected voice must reach
+    EVERY engine — it used to be wired only for google_cloud, so edge silently
+    ignored the user's voice choice (e.g. NamMinh) and used its default."""
+    cfg = {"voice_name": req.voice_name or ""}
+    if req.tts_engine == "google_cloud":
+        cfg["credentials_json"] = config.get_secret("google_cloud_credentials")
+    return cfg
+
+
 def _resolve_output_path(base_filename: str, temp_dir: Path) -> str:
     output_dir = (config.load_config().get("output_dir") or "").strip()
     if output_dir:
@@ -390,13 +400,10 @@ async def _dub_stream(req: DubbingRequest, temp_dir: Path):
                     "absolute_path": output_path, "output_mode": mode})
         return
 
-    voice_config = {}
-    if req.tts_engine == "google_cloud":
-        creds = config.get_secret("google_cloud_credentials")
-        if not creds:
-            yield _sse({"step": "error", "message": "Chưa có Google Cloud credentials."})
-            return
-        voice_config = {"credentials_json": creds, "voice_name": req.voice_name}
+    voice_config = _voice_config_for(req)
+    if req.tts_engine == "google_cloud" and not voice_config.get("credentials_json"):
+        yield _sse({"step": "error", "message": "Chưa có Google Cloud credentials."})
+        return
 
     chunks_dir = temp_dir / f"chunks_{uuid.uuid4().hex}"
     chunks_dir.mkdir(parents=True, exist_ok=True)
