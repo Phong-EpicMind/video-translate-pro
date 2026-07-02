@@ -241,6 +241,40 @@
                     </div>
                 </div>
 
+                <!-- State 1.5: Video uploaded — choose intent before processing -->
+                <div id="readyState" class="workspace-state">
+                    <div class="editor-card ready-card">
+                        <div class="ready-check"><i class="fa-solid fa-circle-check"></i></div>
+                        <h3>Video đã tải lên</h3>
+                        <p id="readyFilename" class="ready-filename"></p>
+                        <h4 class="ready-question">Bạn muốn làm gì với video này?</h4>
+                        <div class="mode-cards">
+                            <button type="button" class="mode-card" id="modeCardDub" data-ready-mode="dubbed">
+                                <i class="fa-solid fa-microphone-lines"></i>
+                                <strong>Thuyết minh</strong>
+                                <span>Đọc bản dịch thành tiếng thay giọng gốc</span>
+                            </button>
+                            <button type="button" class="mode-card" id="modeCardSubs" data-ready-mode="subtitles_only">
+                                <i class="fa-solid fa-closed-captioning"></i>
+                                <strong>Chỉ phụ đề</strong>
+                                <span>Gắn phụ đề dịch, giữ nguyên tiếng gốc</span>
+                            </button>
+                        </div>
+                        <div id="readyDubOptions" class="ready-dub-options">
+                            <div class="ready-voice-row">
+                                <label for="readyVoiceName">Giọng đọc</label>
+                                <select id="readyVoiceName" class="styled-select"></select>
+                                <button type="button" id="readyPreviewBtn" class="btn btn-secondary"><i class="fa-solid fa-volume-high"></i> Nghe thử</button>
+                            </div>
+                            <label class="ready-burn-row"><input type="checkbox" id="readyBurnSubs"> Kèm phụ đề trong video thuyết minh</label>
+                        </div>
+                        <div class="ready-actions">
+                            <button type="button" id="readyBackBtn" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Chọn video khác</button>
+                            <button type="button" id="readyStartBtn" class="btn btn-primary btn-glow"><i class="fa-solid fa-play"></i> Bắt đầu xử lý</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- State 2: Processing Progress & Console -->
                 <div id="processingState" class="workspace-state">
                     <div class="pipeline-card">
@@ -320,11 +354,11 @@
                                 <table class="subtitle-table">
                                     <thead>
                                         <tr>
-                                            <th style="width: 60px;">Dòng</th>
-                                            <th style="width: 150px;">Thời gian (ms)</th>
-                                            <th>Gốc (Original)</th>
+                                            <th style="width: 48px;">Dòng</th>
+                                            <th style="width: 118px;">Thời gian (ms)</th>
+                                            <th style="width: 40%;">Gốc (Original)</th>
                                             <th>Dịch (Translated)</th>
-                                            <th style="width: 60px;">Nghe</th>
+                                            <th style="width: 52px;">Nghe</th>
                                         </tr>
                                     </thead>
                                     <tbody id="subtitleTableBody">
@@ -386,6 +420,23 @@
 
     <!-- Notification Toast -->
     <div id="toast" class="toast">Ghi chú</div>
+
+    <!-- Large row editor: comfortable editing of one subtitle line -->
+    <div id="rowEditModal" class="row-edit-modal" style="display: none;">
+        <div class="row-edit-dialog">
+            <div class="row-edit-header">
+                <h3><i class="fa-solid fa-pen"></i> Sửa dòng <span id="rowEditIndex"></span></h3>
+                <button type="button" id="rowEditCloseBtn" class="btn-toggle-eye" title="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <label for="rowEditOriginal">Gốc (Original)</label>
+            <textarea id="rowEditOriginal" rows="4"></textarea>
+            <label for="rowEditTranslated">Dịch (Translated)</label>
+            <textarea id="rowEditTranslated" rows="4"></textarea>
+            <div class="ready-actions">
+                <button type="button" id="rowEditSaveBtn" class="btn btn-primary"><i class="fa-solid fa-check"></i> Lưu &amp; đóng</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/js/main.js"></script>
 </body>
