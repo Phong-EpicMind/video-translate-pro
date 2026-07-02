@@ -19,7 +19,9 @@ LogCallback = Callable[[str], None]
 ProgressCallback = Callable[[int, int, object], None]
 
 MIN_SPEED = 0.8
-MAX_SPEED = 1.25
+MAX_SPEED = 1.25      # comfortable pace for user-chosen base speed
+MAX_FIT_SPEED = 1.6   # hard cap when compressing to fit a slot — beyond this the
+                      # voice turns chipmunk; losing pace beats losing words
 SPEED_TOLERANCE = 1.05  # only speed up when >5% over the target window
 
 # edge-tts is rate-limited by Microsoft and fails transiently (NoAudioReceived);
@@ -73,15 +75,14 @@ def synthesize_segment(text: str, lang: str, engine: str, output_path: str,
 
         if match_duration and target_duration_ms and target_duration_ms > 0:
             if actual_ms > target_duration_ms * SPEED_TOLERANCE:
-                ratio = min(actual_ms / target_duration_ms, MAX_SPEED)
+                # Compress exactly as much as needed to fit the slot, up to the
+                # hard cap: cutting trailing words is worse than a faster pace.
+                ratio = min(actual_ms / target_duration_ms, MAX_FIT_SPEED)
+                speed = _clamp(base_speed * ratio, high=MAX_FIT_SPEED)
                 if provider.supports_native_rate:
-                    provider.synthesize(
-                        text, lang, output_path, voice_config, _clamp(base_speed * ratio)
-                    )
-                else:
-                    speed = _clamp(base_speed * ratio)
-                    if abs(speed - 1.0) > 0.01:
-                        change_tempo(output_path, speed, log)
+                    provider.synthesize(text, lang, output_path, voice_config, speed)
+                elif abs(speed - 1.0) > 0.01:
+                    change_tempo(output_path, speed, log)
         elif not provider.supports_native_rate and abs(base_speed - 1.0) > 0.01:
             change_tempo(output_path, _clamp(base_speed), log)
 

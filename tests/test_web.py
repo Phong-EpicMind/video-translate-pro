@@ -112,3 +112,29 @@ def test_voice_config_includes_voice_for_free_engines():
                          dub_vol=1.0, burn_subtitles=False, tts_engine="edge",
                          voice_name="vi-VN-NamMinhNeural")
     assert _voice_config_for(req)["voice_name"] == "vi-VN-NamMinhNeural"
+
+
+def test_voice_preview_returns_playable_url(client, monkeypatch):
+    """The voice-preview endpoint synthesises a short sample with the chosen
+    engine+voice and returns a /temp URL the browser can play."""
+    import translatedub.web.server as server
+
+    def fake_segment(text, lang, engine, output_path, *args, **kwargs):
+        with open(output_path, "wb") as f:
+            f.write(b"mp3")
+        return True
+
+    monkeypatch.setattr(server, "synthesize_segment", fake_segment)
+    resp = client.post("/api/voice-preview",
+                       json={"tts_engine": "edge", "voice_name": "vi-VN-NamMinhNeural"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True and body["url"].startswith("/temp/")
+
+
+def test_voice_preview_reports_failure(client, monkeypatch):
+    import translatedub.web.server as server
+    monkeypatch.setattr(server, "synthesize_segment", lambda *a, **k: False)
+    resp = client.post("/api/voice-preview",
+                       json={"tts_engine": "edge", "voice_name": "vi-VN-NamMinhNeural"})
+    assert resp.json()["ok"] is False

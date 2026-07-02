@@ -48,8 +48,25 @@ def test_gtts_speeds_up_when_too_long(monkeypatch, tmp_path):
     out = str(tmp_path / "a.mp3")
     ok = tts.synthesize_segment("hi", "vi", "gtts", out, target_duration_ms=1000)
     assert ok is True
-    # ratio would be 2.0 but is capped to MAX_SPEED
-    assert captured["tempo"] == tts.MAX_SPEED
+    # ratio would be 2.0 but is capped at the hard limit (chipmunk guard)
+    assert captured["tempo"] == tts.MAX_FIT_SPEED
+
+
+def test_speedup_beyond_comfort_only_when_needed_to_fit(monkeypatch, tmp_path):
+    """1400ms into a 1000ms slot needs 1.4x: above the comfort cap (1.25) but
+    within the hard cap (1.6). Compressing beats cutting the last words off."""
+    _mock_gtts(monkeypatch, produced_ms=1400)
+    captured = {}
+
+    def fake_tempo(path, tempo, log=None):
+        captured["tempo"] = tempo
+        return True
+
+    monkeypatch.setattr(tts, "change_tempo", fake_tempo)
+    out = str(tmp_path / "a.mp3")
+    ok = tts.synthesize_segment("hi", "vi", "gtts", out, target_duration_ms=1000)
+    assert ok is True
+    assert abs(captured["tempo"] - 1.4) < 0.01  # exactly what fits, no more
 
 
 def test_unknown_engine_returns_false(tmp_path):

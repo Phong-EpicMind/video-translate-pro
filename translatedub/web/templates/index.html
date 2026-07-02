@@ -145,7 +145,11 @@
 
                     <div class="form-group narration-setting" id="voiceNameGroup" style="display: none;">
                         <label for="voiceName">Giọng đọc</label>
-                        <select id="voiceName" class="styled-select"></select>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <select id="voiceName" class="styled-select" style="flex: 1;"></select>
+                            <button type="button" id="previewVoiceBtn" class="btn btn-secondary" style="white-space: nowrap;"
+                                    title="Nghe thử giọng đang chọn"><i class="fa-solid fa-volume-high"></i> Nghe thử</button>
+                        </div>
                     </div>
 
                     <div class="form-group narration-setting">

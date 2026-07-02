@@ -33,6 +33,7 @@ from ..core import (
     extract_audio,
     get_duration,
     mux_dubbed_audio,
+    synthesize_segment,
     synthesize_segments,
     write_srt,
 )
@@ -41,6 +42,11 @@ from ..filenames import sanitize_stem, unique_path
 from ..pipeline import transcribe_translate
 
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+PREVIEW_TEXTS = {
+    "vi": "Xin chào! Đây là giọng đọc bạn đang chọn cho video thuyết minh.",
+    "en": "Hello! This is the voice you selected for your dubbed video.",
+}
 
 # Only one native folder dialog may be open at a time: a dialog opened by a
 # background process does not steal focus, so users used to click again and
@@ -128,6 +134,27 @@ def create_app(local_only: bool = True) -> FastAPI:
             _folder_dialog_lock.release()
         return {"ok": bool(path), "path": path or ""}
 
+    @app.post("/api/voice-preview")
+    async def voice_preview(req: VoicePreviewRequest):
+        """Synthesise a short sample so users can hear a voice before dubbing."""
+        lang = config.load_config().get("target_lang", "vi")
+        text = PREVIEW_TEXTS.get(lang, PREVIEW_TEXTS["en"])
+        voice = (req.voice_name or "").strip()
+        name = f"voice_preview_{sanitize_stem(req.tts_engine + '_' + (voice or 'default') + '_' + lang)}.mp3"
+        out = temp_dir / name
+        if not out.exists():
+            cfg = {"voice_name": voice}
+            if req.tts_engine == "google_cloud":
+                cfg["credentials_json"] = config.get_secret("google_cloud_credentials")
+            ok = await asyncio.to_thread(
+                synthesize_segment, text, lang, req.tts_engine, str(out),
+                cfg, None, 1.0, False,
+            )
+            if not ok:
+                return {"ok": False, "url": "",
+                        "error": "Không tạo được giọng thử — kiểm tra engine đã cài chưa."}
+        return {"ok": True, "url": f"/temp/{name}"}
+
     @app.get("/api/translate/progress")
     async def translate_progress(video_path: str, src_lang: str, target_lang: str):
         return StreamingResponse(
@@ -157,6 +184,11 @@ class ConfigUpdate(BaseModel):
     base_speed: Optional[float] = None
     match_duration: Optional[bool] = None
     output_dir: Optional[str] = None
+
+
+class VoicePreviewRequest(BaseModel):
+    tts_engine: str
+    voice_name: Optional[str] = ""
 
 
 class RevealRequest(BaseModel):
