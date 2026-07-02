@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-02
+
+### Added
+- **Choose what to do before processing starts.** Uploading a video no longer
+  auto-runs the pipeline: a new step shows the uploaded file and asks
+  "Thuyết minh hay Chỉ phụ đề?", with the voice picker, voice preview, and
+  burn-subtitles option right there. Processing starts only on "Bắt đầu xử lý".
+- **Comfortable subtitle editing.** The translated column is now a growing
+  multi-line textarea, and every row has an expand button that opens a large
+  editor where both the original and the translated text can be edited.
+
+### Changed
+- On screens narrower than 1500px the editor stacks the video above the
+  subtitle grid so the text columns stay wide enough to edit.
+
 ## [0.3.0] - 2026-07-02
 
 ### Added
@@ -107,7 +122,8 @@ First release as a cross-platform pip package (`translatedub`).
 - Initial public prototype: macOS desktop app for video translation, subtitle
   editing, and AI dubbing with Gemini + gTTS / Google Cloud TTS.
 
-[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.3.0
 [0.2.4]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.4
 [0.2.3]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.3

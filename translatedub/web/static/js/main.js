@@ -106,11 +106,49 @@ function updateVoiceDropdown(lang) {
     }
 }
 
+// ----- Ready panel: pause after upload so users choose intent first -----
+function syncReadyControls() {
+    if (!readyState) return;
+    if (modeCardDub) modeCardDub.classList.toggle("active", selectedOutputMode === "dubbed");
+    if (modeCardSubs) modeCardSubs.classList.toggle("active", selectedOutputMode === "subtitles_only");
+    if (readyDubOptions) readyDubOptions.style.display = selectedOutputMode === "dubbed" ? "" : "none";
+    if (readyVoiceName && voiceName) {
+        readyVoiceName.innerHTML = voiceName.innerHTML;
+        readyVoiceName.value = voiceName.value;
+    }
+    if (readyBurnSubs && burnSubtitles) readyBurnSubs.checked = burnSubtitles.checked;
+}
+
+function showReadyPanel() {
+    if (readyFilename) {
+        readyFilename.textContent = currentSourceFilename || currentVideoPath.split(/[\\/]/).pop();
+    }
+    syncReadyControls();
+    switchState(readyState);
+}
+
 // DOM Elements
 const dropzoneState = document.getElementById("dropzoneState");
 const processingState = document.getElementById("processingState");
 const subtitleEditorState = document.getElementById("subtitleEditorState");
 const completeState = document.getElementById("completeState");
+
+const readyState = document.getElementById("readyState");
+const readyFilename = document.getElementById("readyFilename");
+const modeCardDub = document.getElementById("modeCardDub");
+const modeCardSubs = document.getElementById("modeCardSubs");
+const readyDubOptions = document.getElementById("readyDubOptions");
+const readyVoiceName = document.getElementById("readyVoiceName");
+const readyPreviewBtn = document.getElementById("readyPreviewBtn");
+const readyBurnSubs = document.getElementById("readyBurnSubs");
+const readyBackBtn = document.getElementById("readyBackBtn");
+const readyStartBtn = document.getElementById("readyStartBtn");
+const rowEditModal = document.getElementById("rowEditModal");
+const rowEditIndex = document.getElementById("rowEditIndex");
+const rowEditOriginal = document.getElementById("rowEditOriginal");
+const rowEditTranslated = document.getElementById("rowEditTranslated");
+const rowEditSaveBtn = document.getElementById("rowEditSaveBtn");
+const rowEditCloseBtn = document.getElementById("rowEditCloseBtn");
 
 const uploadBox = document.getElementById("uploadBox");
 const videoFileInput = document.getElementById("videoFileInput");
@@ -240,40 +278,78 @@ function setupEventListeners() {
     }
 
     // Voice preview: hear the selected engine+voice before dubbing
+    let previewAudio = null;
+    async function playVoicePreview(voiceValue, btn) {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...';
+        try {
+            const resp = await fetch("/api/voice-preview", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    tts_engine: ttsEngine.value,
+                    voice_name: voiceValue || "",
+                }),
+            });
+            const data = await resp.json();
+            if (data.ok && data.url) {
+                if (previewAudio) previewAudio.pause();
+                previewAudio = new Audio(data.url + "?t=" + Date.now());
+                await previewAudio.play();
+            } else {
+                showToast(data.error || "Không tạo được giọng thử.");
+            }
+        } catch (err) {
+            console.error("Lỗi nghe thử giọng:", err);
+            showToast("Không tạo được giọng thử.");
+        } finally {
+            btn.innerHTML = original;
+            btn.disabled = false;
+        }
+    }
     const previewVoiceBtn = document.getElementById("previewVoiceBtn");
     if (previewVoiceBtn) {
-        let previewAudio = null;
-        previewVoiceBtn.addEventListener("click", async () => {
-            if (previewVoiceBtn.disabled) return;
-            previewVoiceBtn.disabled = true;
-            const original = previewVoiceBtn.innerHTML;
-            previewVoiceBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...';
-            try {
-                const resp = await fetch("/api/voice-preview", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        tts_engine: ttsEngine.value,
-                        voice_name: voiceName.value || "",
-                    }),
-                });
-                const data = await resp.json();
-                if (data.ok && data.url) {
-                    if (previewAudio) previewAudio.pause();
-                    previewAudio = new Audio(data.url + "?t=" + Date.now());
-                    await previewAudio.play();
-                } else {
-                    showToast(data.error || "Không tạo được giọng thử.");
-                }
-            } catch (err) {
-                console.error("Lỗi nghe thử giọng:", err);
-                showToast("Không tạo được giọng thử.");
-            } finally {
-                previewVoiceBtn.innerHTML = original;
-                previewVoiceBtn.disabled = false;
-            }
+        previewVoiceBtn.addEventListener("click", () => playVoicePreview(voiceName.value, previewVoiceBtn));
+    }
+
+    // Ready panel: mode cards, voice mirror, start
+    [modeCardDub, modeCardSubs].forEach(card => {
+        if (!card) return;
+        card.addEventListener("click", () => {
+            setOutputMode(card.dataset.readyMode);
+            syncReadyControls();
+        });
+    });
+    if (readyVoiceName) {
+        readyVoiceName.addEventListener("change", () => { voiceName.value = readyVoiceName.value; });
+    }
+    if (readyBurnSubs) {
+        readyBurnSubs.addEventListener("change", () => {
+            if (burnSubtitles) burnSubtitles.checked = readyBurnSubs.checked;
         });
     }
+    if (readyPreviewBtn) {
+        readyPreviewBtn.addEventListener("click", () => playVoicePreview(readyVoiceName.value, readyPreviewBtn));
+    }
+    if (readyBackBtn) readyBackBtn.addEventListener("click", () => resetAppFlow());
+    if (readyStartBtn) {
+        readyStartBtn.addEventListener("click", () => {
+            saveConfigSilently();
+            startTranslationPipeline(currentVideoPath);
+        });
+    }
+
+    // Large row editor
+    if (rowEditCloseBtn) rowEditCloseBtn.addEventListener("click", closeRowEditor);
+    if (rowEditSaveBtn) rowEditSaveBtn.addEventListener("click", saveRowEditor);
+    if (rowEditModal) {
+        rowEditModal.addEventListener("click", (e) => { if (e.target === rowEditModal) closeRowEditor(); });
+    }
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && rowEditModal && rowEditModal.style.display !== "none") closeRowEditor();
+    });
 
     // Handle Engine Toggle to show/hide credentials
     ttsEngine.addEventListener("change", () => {
@@ -344,8 +420,8 @@ function setupEventListeners() {
         }
         saveConfigSilently();
         currentVideoPath = path;
-        currentSourceFilename = path.split("/").pop();
-        startTranslationPipeline(path);
+        currentSourceFilename = path.split(/[\\/]/).pop();
+        showReadyPanel();
     });
 
     // Navigation buttons
@@ -412,7 +488,7 @@ function setupEventListeners() {
 
 // Switch between panels
 function switchState(activeState) {
-    [dropzoneState, processingState, subtitleEditorState, completeState].forEach(state => {
+    [dropzoneState, readyState, processingState, subtitleEditorState, completeState].forEach(state => {
         state.classList.remove("active");
     });
     activeState.classList.add("active");
@@ -729,7 +805,7 @@ async function handleFileUpload(file) {
         logToConsole(`Đã tải video thành công lên: ${data.video_path}`, "success");
         currentVideoPath = data.video_path;
         currentSourceFilename = data.filename || file.name;
-        startTranslationPipeline(data.video_path);
+        showReadyPanel();
     } catch (e) {
         logToConsole(`Lỗi tải video: ${e.message}`, "error");
         showToast("Lỗi kết nối máy chủ.");
@@ -992,7 +1068,10 @@ function initSubtitleEditor(subtitles) {
             </td>
             <td class="sub-text-orig">${escapeHtml(sub.original_text)}</td>
             <td class="sub-text-trans">
-                <input type="text" class="sub-trans-input" data-index="${sub.index}" value="${escapeHtml(sub.translated_text)}">
+                <div class="trans-cell">
+                    <textarea class="sub-trans-input" data-index="${sub.index}" rows="1">${escapeHtml(sub.translated_text)}</textarea>
+                    <button type="button" class="btn-expand-row" data-index="${sub.index}" title="Mở khung sửa lớn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+                </div>
             </td>
             <td>
                 <button type="button" class="btn-play-row" onclick="playSubtitleSegment(${sub.start_ms}, ${sub.end_ms})">
@@ -1002,6 +1081,51 @@ function initSubtitleEditor(subtitles) {
         `;
         subtitleTableBody.appendChild(tr);
     });
+
+    subtitleTableBody.querySelectorAll("textarea.sub-trans-input").forEach(t => {
+        autoGrow(t);
+        t.addEventListener("input", () => autoGrow(t));
+    });
+    subtitleTableBody.querySelectorAll(".btn-expand-row").forEach(b => {
+        b.addEventListener("click", () => openRowEditor(parseInt(b.dataset.index, 10)));
+    });
+}
+
+// Textareas grow with their content so long translations stay readable.
+function autoGrow(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight + 2, 220) + "px";
+}
+
+let rowEditCurrentIndex = null;
+
+function openRowEditor(index) {
+    const input = subtitleTableBody.querySelector(`textarea.sub-trans-input[data-index="${index}"]`);
+    const row = input ? input.closest("tr") : null;
+    if (!row) return;
+    rowEditCurrentIndex = index;
+    rowEditIndex.textContent = index;
+    rowEditOriginal.value = row.querySelector(".sub-text-orig").textContent;
+    rowEditTranslated.value = input.value;
+    rowEditModal.style.display = "flex";
+    rowEditTranslated.focus();
+}
+
+function closeRowEditor() {
+    rowEditModal.style.display = "none";
+    rowEditCurrentIndex = null;
+}
+
+function saveRowEditor() {
+    if (rowEditCurrentIndex === null) return closeRowEditor();
+    const input = subtitleTableBody.querySelector(`textarea.sub-trans-input[data-index="${rowEditCurrentIndex}"]`);
+    const row = input ? input.closest("tr") : null;
+    if (row) {
+        row.querySelector(".sub-text-orig").textContent = rowEditOriginal.value;
+        input.value = rowEditTranslated.value;
+        autoGrow(input);
+    }
+    closeRowEditor();
 }
 
 // Play only selected video segment

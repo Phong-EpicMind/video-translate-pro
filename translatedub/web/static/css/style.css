@@ -916,7 +916,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .video-preview-pane {
-    width: 38%;
+    width: 30%;
+    min-width: 260px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -1335,5 +1336,223 @@ input[type="range"]::-webkit-slider-thumb:hover {
     .flow-line {
         min-width: 24px;
         flex: 0 0 24px;
+    }
+}
+
+/* ----- Ready panel: choose intent after upload ----- */
+.ready-card {
+    max-width: 640px;
+    margin: 40px auto;
+    padding: 40px;
+    text-align: center;
+}
+
+.ready-check {
+    font-size: 3rem;
+    color: var(--success);
+    margin-bottom: 12px;
+}
+
+.ready-filename {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    word-break: break-all;
+    margin: 8px 0 24px;
+}
+
+.ready-question {
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+
+.mode-cards {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.mode-card {
+    flex: 1;
+    max-width: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 16px;
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.mode-card i { font-size: 1.6rem; }
+.mode-card strong { color: var(--text-primary); font-size: 1.05rem; }
+.mode-card span { font-size: 0.82rem; line-height: 1.4; }
+
+.mode-card:hover { transform: translateY(-2px); border-color: var(--border-active); }
+
+.mode-card.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 18px var(--primary-glow);
+    color: var(--text-primary);
+}
+
+.ready-dub-options {
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    text-align: left;
+}
+
+.ready-voice-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ready-voice-row label { color: var(--text-secondary); white-space: nowrap; }
+.ready-voice-row select { flex: 1; }
+
+.ready-burn-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.ready-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+/* ----- Subtitle editor: growing textarea + expand button ----- */
+.subtitle-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.subtitle-table td.sub-text-orig,
+.subtitle-table td.sub-text-trans {
+    word-break: break-word;
+    vertical-align: top;
+}
+
+.trans-cell {
+    position: relative;
+}
+
+textarea.sub-trans-input {
+    display: block;
+    width: 100%;
+    padding-right: 32px;
+    min-height: 38px;
+    max-height: 220px;
+    resize: none;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    padding: 8px 10px;
+}
+
+textarea.sub-trans-input:focus {
+    outline: none;
+    border-color: var(--border-active);
+}
+
+.btn-expand-row {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 0.75rem;
+}
+
+.btn-expand-row:hover { color: var(--text-primary); border-color: var(--border-active); }
+
+/* ----- Large row editor modal ----- */
+.row-edit-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 7, 13, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.row-edit-dialog {
+    width: min(720px, 92vw);
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-active);
+    border-radius: 16px;
+    padding: 24px 28px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.row-edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.row-edit-header .btn-toggle-eye { position: static; }
+
+.row-edit-dialog label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin: 12px 0 6px;
+}
+
+.row-edit-dialog textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 90px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    padding: 12px 14px;
+}
+
+.row-edit-dialog textarea:focus { outline: none; border-color: var(--border-active); }
+
+.row-edit-dialog .ready-actions { margin-top: 20px; justify-content: flex-end; }
+
+/* Editor: below 1500px the side-by-side split leaves the subtitle grid too
+   narrow to edit comfortably — stack the video above the grid instead. */
+@media (max-width: 1500px) {
+    .editor-workspace {
+        flex-direction: column;
+    }
+
+    .video-preview-pane {
+        width: 100%;
+        max-width: 460px;
     }
 }
