@@ -100,6 +100,45 @@ pyVideoTrans (~18k stars) and VideoLingo (~16k stars). Specs/plans live in
   `pip install translatedub[free]`" vs "cloud → add a key".
 - **Phase C (next):** premium OpenAI TTS + ElevenLabs (and OpenAI ASR) providers.
 
+## Dubbing invariants (learned from real-user bugs — do not regress)
+
+- **One video = one voice, always.** Never fall back to another TTS engine
+  per-segment (that shipped mixed-voice videos once). `core.tts.synthesize_segments`
+  owns the job: retry with backoff first (`TTS_MAX_ATTEMPTS`, edge-tts is
+  rate-limited by Microsoft and fails transiently); if a free engine still dies,
+  re-synthesise the ENTIRE video with gTTS and say so in the log. Premium engines
+  and gTTS fail loudly.
+- **The chosen voice must reach every engine.** Web requests build voice config via
+  `_voice_config_for()`; wiring `voice_name` only for one engine silently ignored
+  the user's choice once.
+- **Lines must never talk over each other, and words must not be cut.** Duration
+  matching targets the gap until the NEXT line starts; overflow compresses speech up
+  to `MAX_FIT_SPEED` (1.6x) before the assembler's boundary trim
+  (`_clip_limit_ms` + fade) ever kicks in. `MAX_SPEED` (1.25x) is only the comfort
+  cap for the user's base-speed setting.
+- **Users verify voices by ear:** `POST /api/voice-preview` + the "Nghe thử" button
+  synthesise a cached sample with the exact engine+voice. Keep it working.
+
+## Web UX invariants
+
+- **Single flow with an explicit intent step — NOT separate tabs.** After upload the
+  ready panel asks dubbing vs subtitles-only (voice picker + preview + burn option
+  inline) and processing starts only on "Bắt đầu xử lý". Maintainer decision;
+  revisit tabs only if standalone tools (SRT-only translate, TTS studio) are added.
+  The ready panel mirrors the sidebar controls (write-through), it does not own state.
+- **The subtitle editor must stay comfortably editable:** growing textareas, per-row
+  expand modal (edits BOTH original and translated; the original cell's textContent
+  flows into the exported SRT), video stacks above the grid below 1500px.
+- **macOS folder dialog is hosted by Finder** (`tell application "Finder"`) so it
+  truly opens frontmost; a server-side lock (`_folder_dialog_lock`) plus a disabled
+  button guarantee one dialog at a time. `tell me to activate` does NOT work for
+  background processes — verified via System Events.
+- **Before shipping any UI change, run a live Playwright pass** (upload → ready →
+  editor → export). It has caught real bugs unit tests cannot (TDZ crash, collapsed
+  textarea column). Remind the maintainer to hard-reload (Cmd+Shift+R) after
+  upgrades — the browser caches `main.js`.
+- No Google-locked copy anywhere in the UI: engines are pluggable by design.
+
 ## Licensing rules (CRITICAL — the maintainer is strict about this)
 
 Verify licenses **from source** (the actual LICENSE file / HF model-card metadata),
@@ -154,9 +193,13 @@ translatedub serve --no-browser # manual smoke test
   select + its save payloads. Missing one leaves the UI out of sync with the backend.
 - Design specs live in `docs/superpowers/specs/`; implementation plans in
   `docs/superpowers/plans/`.
-- **Current state:** Phases A + B shipped on `main` (PRs #11, #12); UX fixes in #13
-  (keyless UI gating, OS-neutral copy, native folder picker); OSS polish + first PyPI
-  publish (v0.2.0, automated releases) in #14. Next: Phase C (premium OpenAI/ElevenLabs).
+- **Current state:** Phases A + B shipped (PRs #11, #12); UX fixes #13; OSS polish +
+  first PyPI publish v0.2.0 (#14). Maintainer-testing rounds then shipped v0.2.1
+  (one-voice guarantee, folder-dialog lock), v0.2.2 (Finder-hosted dialog), v0.2.3
+  (voice reaches every engine; no overlapping lines; de-Googled copy), v0.2.4 (last
+  Gemini-hardcoded strings), v0.3.0 (voice preview; compress-don't-clip), v0.4.0
+  (intent step after upload; large row editor). All on PyPI via tag-driven releases.
+  Next: Phase C (premium OpenAI/ElevenLabs).
 
 ## Backlog & decisions (maintainer-approved order)
 
