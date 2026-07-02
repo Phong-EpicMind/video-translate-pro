@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-02
+
+### Added
+- **Voice preview.** A "Nghe thử" button next to the voice picker synthesises a
+  short sample with the exact engine + voice selected, so users can hear
+  HoaiMy/NamMinh (or any voice) before dubbing. Samples are cached.
+
+### Fixed
+- **No more clipped words when lines are tight.** When a line is too long for
+  its slot, the app now compresses speech exactly as much as needed (hard cap
+  1.6x) instead of cutting the last words off; the boundary trim remains only
+  as a last resort for extreme cases.
+
 ## [0.2.4] - 2026-07-02
 
 ### Changed
@@ -94,7 +107,8 @@ First release as a cross-platform pip package (`translatedub`).
 - Initial public prototype: macOS desktop app for video translation, subtitle
   editing, and AI dubbing with Gemini + gTTS / Google Cloud TTS.
 
-[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/Phong-EpicMind/video-translate-pro/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.3.0
 [0.2.4]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.4
 [0.2.3]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.3
 [0.2.2]: https://github.com/Phong-EpicMind/video-translate-pro/releases/tag/v0.2.2

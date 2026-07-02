@@ -239,6 +239,42 @@ function setupEventListeners() {
         });
     }
 
+    // Voice preview: hear the selected engine+voice before dubbing
+    const previewVoiceBtn = document.getElementById("previewVoiceBtn");
+    if (previewVoiceBtn) {
+        let previewAudio = null;
+        previewVoiceBtn.addEventListener("click", async () => {
+            if (previewVoiceBtn.disabled) return;
+            previewVoiceBtn.disabled = true;
+            const original = previewVoiceBtn.innerHTML;
+            previewVoiceBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...';
+            try {
+                const resp = await fetch("/api/voice-preview", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        tts_engine: ttsEngine.value,
+                        voice_name: voiceName.value || "",
+                    }),
+                });
+                const data = await resp.json();
+                if (data.ok && data.url) {
+                    if (previewAudio) previewAudio.pause();
+                    previewAudio = new Audio(data.url + "?t=" + Date.now());
+                    await previewAudio.play();
+                } else {
+                    showToast(data.error || "Không tạo được giọng thử.");
+                }
+            } catch (err) {
+                console.error("Lỗi nghe thử giọng:", err);
+                showToast("Không tạo được giọng thử.");
+            } finally {
+                previewVoiceBtn.innerHTML = original;
+                previewVoiceBtn.disabled = false;
+            }
+        });
+    }
+
     // Handle Engine Toggle to show/hide credentials
     ttsEngine.addEventListener("change", () => {
         toggleTtsEngineGroups();
