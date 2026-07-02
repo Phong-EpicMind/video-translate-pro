@@ -140,7 +140,9 @@ translatedub serve --no-browser # manual smoke test
   (Gemini, cloud TTS, ffmpeg subprocess); tests must not hit the network or need ffmpeg.
 - CI matrix: Ubuntu/macOS/Windows × Python 3.9/3.11/3.12, plus Bandit and a hygiene job
   that blocks tracked secrets/build artifacts. Keep it green before merging.
-- Bump the version in both `pyproject.toml` and `translatedub/__init__.py` on release.
+- Bump the version in both `pyproject.toml` and `translatedub/__init__.py` on release,
+  and add the version's section to `CHANGELOG.md`. Publishing to PyPI is automatic:
+  pushing a `v*` tag runs `.github/workflows/release.yml` (trusted publishing).
 
 ## Conventions
 
@@ -154,5 +156,4 @@ translatedub serve --no-browser # manual smoke test
   `docs/superpowers/plans/`.
 - **Current state:** Phases A + B shipped on `main` (PRs #11, #12); UX fixes in #13
   (keyless UI gating, OS-neutral copy, native folder picker). Next: Phase C (premium
-  OpenAI/ElevenLabs). Open for the maintainer: rotate the previously-leaked Gemini + GCP
-  keys.
+  OpenAI/ElevenLabs).
