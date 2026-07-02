@@ -54,18 +54,23 @@ pip install "translatedub[cloud]"
 
 ## Quick start
 
-```bash
-# 1. Store your Gemini API key (kept in a chmod 600 file, never in the repo)
-translatedub config set-key
+**No API key needed** with the `[free]` extra installed:
 
-# 2a. Translate + dub a video in one command
+```bash
+# Translate + dub a video in one command
 translatedub translate input.mp4 --to vi -o output.mp4
 
-# 2b. …or open the visual editor in your browser (edit subtitles before export)
+# …or open the visual editor in your browser (edit subtitles before export)
 translatedub serve
 ```
 
-Get a free Gemini key at [Google AI Studio](https://aistudio.google.com/).
+**Optional — higher quality with a Gemini key** (free tier at
+[Google AI Studio](https://aistudio.google.com/)). With a key stored, the app prefers
+Gemini automatically for transcription and translation:
+
+```bash
+translatedub config set-key   # kept in a chmod 600 file, never in the repo
+```
 
 ## Three ways to use it
 
@@ -103,11 +108,15 @@ export_video("input.mp4", subs, "output.mp4", target_lang="vi")
 ## How it works
 
 1. Extract audio with FFmpeg.
-2. Transcribe and translate speech with **Google Gemini** (auto-chunked for long videos).
-3. Review/edit bilingual subtitles (in the web UI) or use them directly (CLI/library).
-4. Generate a dubbed voice track with **gTTS** (free) or **Google Cloud TTS** (premium),
-   with optional duration matching so speech fits each subtitle window.
-5. Mux the dub over the original video, with optional burned-in or soft subtitles.
+2. Transcribe speech with **faster-whisper** (local, free) or **Google Gemini**
+   (auto-chunked for long videos).
+3. Translate with **deep-translator** (free) or **Gemini** — by default the app picks
+   Gemini when a key is present, the free local stack otherwise.
+4. Review/edit bilingual subtitles (in the web UI) or use them directly (CLI/library).
+5. Generate a dubbed voice track with **edge-tts** (free neural voices, default),
+   **gTTS** (fallback), or **Google Cloud TTS** (premium), with optional duration
+   matching so speech fits each subtitle window.
+6. Mux the dub over the original video, with optional burned-in or soft subtitles.
 
 This is an independent implementation inspired by the general workflow of
 [pyVideoTrans](https://github.com/jianchang512/pyvideotrans). It does not vendor or
@@ -162,20 +171,27 @@ thư viện Python.
 Cần **Python 3.9+**. Không cần ký app, không cảnh báo tải về.
 
 ```bash
-pipx install translatedub     # hoặc: pip install translatedub
+pip install "translatedub[free]"   # bản đầy đủ, KHÔNG cần API key
 ```
 
 FFmpeg tự lo: dùng `ffmpeg` hệ thống nếu có, không thì lấy bản đi kèm `imageio-ffmpeg`.
 
 ### Bắt đầu nhanh
 
+**Không cần API key** — nhận dạng giọng nói, dịch và lồng tiếng đều có sẵn bản miễn phí
+(faster-whisper + deep-translator + edge-tts, có giọng tiếng Việt tự nhiên):
+
 ```bash
-translatedub config set-key                         # nhập Gemini API key (lưu file chmod 600)
 translatedub translate input.mp4 --to vi -o out.mp4 # dịch + lồng tiếng một lệnh
 translatedub serve                                  # hoặc mở giao diện web để sửa phụ đề
 ```
 
-Lấy Gemini key miễn phí tại [Google AI Studio](https://aistudio.google.com/).
+Muốn chất lượng cao hơn thì thêm Gemini key (có bậc miễn phí tại
+[Google AI Studio](https://aistudio.google.com/)) — app sẽ tự ưu tiên Gemini:
+
+```bash
+translatedub config set-key                         # key lưu file chmod 600 trên máy bạn
+```
 
 ### Bảo mật
 
