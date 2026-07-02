@@ -49,3 +49,6 @@ config.json
 *.spec
 bin/
 release-artifacts/
+
+# Browser-automation debug artifacts
+.playwright-mcp/

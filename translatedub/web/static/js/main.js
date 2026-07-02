@@ -215,9 +215,12 @@ function setupEventListeners() {
     // Select output directory click
     if (selectOutputDirBtn) {
         selectOutputDirBtn.addEventListener("click", async () => {
+            if (selectOutputDirBtn.disabled) return; // one dialog at a time
+            selectOutputDirBtn.disabled = true;
             try {
                 const resp = await fetch("/api/pick-folder", { method: "POST" });
                 const data = await resp.json();
+                if (data.busy) return; // a dialog is already open on the machine
                 if (data.ok && data.path) {
                     outputDir.value = data.path;
                     saveConfigSilently();
@@ -230,6 +233,8 @@ function setupEventListeners() {
             } catch (err) {
                 console.error("Lỗi mở hộp thoại chọn thư mục:", err);
                 showToast("Không mở được hộp thoại. Hãy dán đường dẫn trực tiếp.");
+            } finally {
+                selectOutputDirBtn.disabled = false;
             }
         });
     }

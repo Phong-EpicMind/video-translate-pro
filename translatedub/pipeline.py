@@ -18,7 +18,7 @@ from .core import (
     extract_audio,
     get_duration,
     mux_dubbed_audio,
-    synthesize_segment,
+    synthesize_segments,
     transcribe_and_translate,
     write_srt,
 )
@@ -103,19 +103,11 @@ def export_video(video_path: str, subtitles: list[Subtitle], output_path: str,
     chunks_dir.mkdir(parents=True, exist_ok=True)
     dubbed_audio = str(config.temp_dir() / f"{stem}_{uuid.uuid4().hex[:8]}_dub.mp3")
     try:
-        for i, sub in enumerate(subtitles, start=1):
-            clip = str(chunks_dir / f"segment_{sub.index}.mp3")
-            if log:
-                log(f"Synthesising line {i}/{len(subtitles)}...")
-            ok = synthesize_segment(
-                text=sub.translated_text, lang=target_lang, engine=engine,
-                output_path=clip, voice_config=voice_config or {},
-                target_duration_ms=sub.duration_ms, base_speed=base_speed,
-                match_duration=match_duration, log=log,
-            )
-            if not ok:
-                raise RuntimeError(f"TTS failed for line {sub.index}.")
-            sub.audio_path = clip
+        synthesize_segments(
+            subtitles, lang=target_lang, engine=engine, chunks_dir=str(chunks_dir),
+            voice_config=voice_config or {}, base_speed=base_speed,
+            match_duration=match_duration, log=log,
+        )
 
         if log:
             log("Assembling dubbed track...")
