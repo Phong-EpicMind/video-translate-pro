@@ -113,6 +113,11 @@ def create_app(local_only: bool = True) -> FastAPI:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
+    @app.post("/api/pick-folder")
+    async def pick_folder():
+        path = _pick_folder_native()
+        return {"ok": bool(path), "path": path or ""}
+
     @app.get("/api/translate/progress")
     async def translate_progress(video_path: str, src_lang: str, target_lang: str):
         return StreamingResponse(
@@ -183,6 +188,47 @@ def _reveal_in_file_manager(path: str) -> None:
         subprocess.run(["explorer", "/select,", os.path.normpath(path)], check=False)
     else:
         subprocess.run(["xdg-open", os.path.dirname(path)], check=False)
+
+
+def _pick_folder_native() -> "Optional[str]":
+    """Open the OS-native "choose folder" dialog on this machine and return the path.
+
+    Returns None when cancelled or no dialog tool is available. Local-first only:
+    the dialog appears on the same machine that runs the server.
+    """
+    try:
+        if sys.platform == "darwin":
+            script = 'POSIX path of (choose folder with prompt "Chọn thư mục lưu video")'
+            result = subprocess.run(["osascript", "-e", script],
+                                    capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout.strip() or None
+        elif os.name == "nt":
+            ps = (
+                "Add-Type -AssemblyName System.Windows.Forms; "
+                "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                "if ($d.ShowDialog() -eq 'OK') { Write-Output $d.SelectedPath }"
+            )
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                capture_output=True, text=True,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        else:  # Linux / BSD: try common dialog tools
+            for cmd in (
+                ["zenity", "--file-selection", "--directory",
+                 "--title=Chọn thư mục lưu video"],
+                ["kdialog", "--getexistingdirectory", os.path.expanduser("~")],
+            ):
+                if shutil.which(cmd[0]):
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode == 0 and result.stdout.strip():
+                        return result.stdout.strip()
+                    return None
+    except Exception:  # noqa: BLE001 - a missing/failed dialog is non-fatal
+        return None
+    return None
 
 
 def _resolve_output_path(base_filename: str, temp_dir: Path) -> str:
