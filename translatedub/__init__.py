@@ -5,4 +5,4 @@ Cross-platform, open source, no code signing required. Use as a CLI
 (``from translatedub.core import transcribe_and_translate``).
 """
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"

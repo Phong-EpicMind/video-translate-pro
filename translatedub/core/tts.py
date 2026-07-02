@@ -117,10 +117,17 @@ def synthesize_segments(subtitles, lang: str, engine: str, chunks_dir: str,
                 progress(i, len(subs), sub)
             elif log:
                 log(f"Synthesising line {i}/{len(subs)}...")
+            # Aim at the gap until the NEXT line starts, not the subtitle window:
+            # speech may spill into the silence after its line (less speed-up,
+            # more natural), but must never run into the next line's speech.
+            if i < len(subs):
+                target_ms = max(0, subs[i].start_ms - sub.start_ms)
+            else:
+                target_ms = sub.duration_ms
             ok = synthesize_segment(
                 text=sub.translated_text, lang=lang, engine=engine_name,
                 output_path=clip, voice_config=voice_config,
-                target_duration_ms=sub.duration_ms, base_speed=base_speed,
+                target_duration_ms=target_ms, base_speed=base_speed,
                 match_duration=match_duration, log=log,
             )
             if not ok:
